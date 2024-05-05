@@ -35,7 +35,6 @@ namespace RHI
 	public:
 		RESULT CreateCommandAllocators(CommandListType type,uint32_t numAllocators,CommandAllocator** pAllocator);
 		template<typename T> RESULT CreateCommandList(CommandListType type,CommandAllocator* allocator,T** pCommandList);
-		template<> RESULT CreateCommandList<GraphicsCommandList>(CommandListType type, CommandAllocator* allocator, GraphicsCommandList** ppCommandList);
 		RESULT CreateDescriptorHeap(DescriptorHeapDesc* desc, DescriptorHeap** descriptorHeap);
 		RESULT CreateDynamicDescriptor(DescriptorHeap* heap, DynamicDescriptor** descriptor, DescriptorType type, ShaderStage stage, RHI::Buffer* buffer,uint32_t offset, uint32_t size);
 		RESULT CreateTextureView(TextureViewDesc* desc, TextureView** view);
@@ -62,6 +61,7 @@ namespace RHI
 		RESULT QueueWaitIdle(CommandQueue* queue);
 		~Device();
 	};
+	template<> RESULT Device::CreateCommandList<GraphicsCommandList>(CommandListType type, CommandAllocator* allocator, GraphicsCommandList** ppCommandList);
 	const RESULT& vkCompareFunc();
 }
 

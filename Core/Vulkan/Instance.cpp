@@ -5,6 +5,8 @@
 #include "VulkanSpecific.h"
 #include <vector>
 #include <iostream>
+#include <numeric> //for itoa
+#include <array>
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -14,13 +16,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	std::string_view view(pCallbackData->pMessage);
 	char id_string[1024];
 	strcpy(id_string, "MessageID = 0x");
-	_itoa(pCallbackData->messageIdNumber, id_string + strlen(id_string), 16);
+	sprintf(id_string + strlen(id_string), "%x", pCallbackData->messageIdNumber);
 	size_t ind = view.find(id_string);
 	ind += strlen(id_string);
 	std::cerr << std::endl << "validation layer" << pCallbackData->pMessage + ind << std::endl;
 	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != 101294395 && pCallbackData->messageIdNumber != 0x4dae5635)
 	{
-		__debugbreak();
+		DEBUG_BREAK;
 	}
 
 	return VK_FALSE;
@@ -58,7 +60,7 @@ extern "C"
 		info.pNext = &features;
 		info.enabledLayerCount = ARRAYSIZE(layerNames);
 		info.ppEnabledLayerNames = layerNames;
-		info.enabledExtensionCount = 3;
+		info.enabledExtensionCount = ARRAYSIZE(extensionName);
 		info.ppEnabledExtensionNames = extensionName;
 		info.pApplicationInfo = &appInfo;
 		VkResult res = vkCreateInstance(&info, nullptr, (VkInstance*)&vinstance->ID);

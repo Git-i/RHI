@@ -9,7 +9,7 @@ namespace RHI
 		auto vbuffer = (vBuffer*)this;
 		if (vbuffer->vma_ID)
 		{
-			return vmaMapMemory(vma_allocator, vbuffer->vma_ID, data);
+			return vmaMapMemory(((vDevice*)device)->allocator, vbuffer->vma_ID, data);
 		}
 		return vkMapMemory((VkDevice)((vDevice*)device)->ID, (VkDeviceMemory)vbuffer->heap, vbuffer->offset, vbuffer->size, 0, data);
 	}
@@ -18,7 +18,7 @@ namespace RHI
 		auto vbuffer = (vBuffer*)this;
 		if (vbuffer->vma_ID)
 		{
-			vmaUnmapMemory(vma_allocator, vbuffer->vma_ID);
+			vmaUnmapMemory(((vDevice*)device)->allocator, vbuffer->vma_ID);
 			return 0;
 		}
 		vkUnmapMemory((VkDevice)((vDevice*)device)->ID, (VkDeviceMemory)vbuffer->heap);

@@ -105,7 +105,7 @@ namespace RHI
 		BlendFac dstAlphaBlend;
 		BlendOp ColorBlendOp;
 		BlendOp AlphaBlendOp;
-		LogicOp LogicOp;
+		LogicOp logicOp;
 		uint8_t writeMask;
 	};
 	enum class DepthWriteMask

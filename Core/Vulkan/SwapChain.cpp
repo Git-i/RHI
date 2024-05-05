@@ -17,12 +17,10 @@ namespace RHI
 		SampleQuality = 0;
 		SwapChainFormat = RHI::Format::R8G8B8A8_UNORM;
 		Windowed = true;
-		BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	}
 	SwapChainDesc::SwapChainDesc(Zero_t)
 	{
-		ZeroMemory(this, sizeof(SwapChainDesc));
+		memset(this, 0,sizeof(SwapChainDesc));
 	}
 	SwapChainDesc::SwapChainDesc()
 	{

@@ -25,7 +25,6 @@ namespace RHI
     //todo find a better of doing this, because this would make the rhi single-device(gpu)
     //maybe make it an array or vector of allocators for multiple devices??
     
-    extern VmaAllocator vma_allocator;
     enum QueueFamilyIndicesFlags
     {
         HasGraphics = 1 << 1,
@@ -245,7 +244,7 @@ namespace RHI
         virtual void Destroy() override
         {
             delete Object::refCnt;
-            delete Object::ID;
+            delete ((SpvReflectShaderModule*)Object::ID);
         }
     };
 }

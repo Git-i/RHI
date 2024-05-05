@@ -3,7 +3,6 @@
 #include "FormatsAndTypes.h"
 #include "Surface.h"
 #include "Texture.h"
-#include <dxgi1_6.h>
 namespace RHI
 {
 	class RHI_API SwapChain : public Object
@@ -24,11 +23,11 @@ namespace RHI
 		Format SwapChainFormat;
 		unsigned int SampleCount;
 		unsigned int SampleQuality;
-		DXGI_USAGE BufferUsage;
+		//DXGI_USAGE BufferUsage;
 		unsigned int BufferCount;
-		BOOL Windowed;
-		DXGI_SWAP_EFFECT SwapEffect;
-		UINT Flags;
+		bool Windowed;
+		//DXGI_SWAP_EFFECT SwapEffect;
+		uint32_t Flags;
 
 		SwapChainDesc(Default_t);
 		SwapChainDesc(Zero_t);

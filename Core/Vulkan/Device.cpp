@@ -15,13 +15,13 @@ static void SelectHeapIndices(RHI::vDevice* device)
     std::uint32_t DefaultHeap = UINT32_MAX;
     std::uint32_t UploadHeap = UINT32_MAX;
     std::uint32_t ReadbackHeap = UINT32_MAX;
-    int iterator = 0;
+    uint32_t iterator = 0;
     for (auto& prop : device->HeapProps)
     {
-        if (prop.memoryLevel ==  RHI::MemoryLevel::DedicatedRAM && iterator < DefaultHeap) DefaultHeap = iterator;
+        if ((prop.memoryLevel ==  RHI::MemoryLevel::DedicatedRAM) && (iterator < DefaultHeap)) DefaultHeap = iterator;
         if (prop.pageProperty == RHI::CPUPageProperty::WriteCached) UploadHeap = iterator;
-        if (prop.pageProperty == RHI::CPUPageProperty::WriteCombined && iterator < UploadHeap) UploadHeap = iterator;
-        if (prop.pageProperty == RHI::CPUPageProperty::WriteCombined || prop.pageProperty == RHI::CPUPageProperty::WriteCached && iterator < ReadbackHeap) ReadbackHeap = iterator;
+        if ((prop.pageProperty == RHI::CPUPageProperty::WriteCombined) && (iterator < UploadHeap)) UploadHeap = iterator;
+        if ((prop.pageProperty == RHI::CPUPageProperty::WriteCombined) || ((prop.pageProperty == RHI::CPUPageProperty::WriteCached) && (iterator < ReadbackHeap))) ReadbackHeap = iterator;
         iterator++;
     }
     device->DefaultHeapIndex = DefaultHeap;
@@ -39,7 +39,7 @@ extern "C"
         RHI::vDevice* vdevice = new RHI::vDevice;
         RHI::vCommandQueue* vqueue = new RHI::vCommandQueue[numCommandQueues];
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
-        for (int i = 0; i < memProps.memoryTypeCount; i++)
+        for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
             VkFlags flags = memProps.memoryTypes[i].propertyFlags;
             RHI::HeapProperties prop;
@@ -67,9 +67,9 @@ extern "C"
             float queuePriority = commandQueueInfos[i].Priority;
             qInfo.pQueuePriorities = &queuePriority;
             std::uint32_t index = 0;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
             if (qcounts[index] <= usedQueues[index])
             {
                 commandQueueInfos[i]._unused = usedQueues[index] - 1;
@@ -134,9 +134,9 @@ extern "C"
         for (int i = 0; i < numCommandQueues; i++)
         {
             uint32_t index = 0;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
-            if (commandQueueInfos[i].CommandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
+            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
             vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&vqueue[i].ID);
             vqueue[i].device = vdevice;
             commandQueues[i] = &vqueue[i];
@@ -158,7 +158,6 @@ extern "C"
         vmaInfo.pTypeExternalMemoryHandleTypes = (flags & RHI::DeviceCreateFlags::ShareAutomaticMemory) != RHI::DeviceCreateFlags::None ? ext_mem:0;//
         
         vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
-        RHI::vma_allocator = vdevice->allocator;
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
         acInfo.vkDevice = (VkDevice)vdevice->ID;
@@ -172,7 +171,6 @@ namespace RHI
 {   
     Default_t Default = {};
     Zero_t Zero = {};
-    VmaAllocator RHI::vma_allocator = nullptr;
     static VkResult CreateShaderModule(const char* filename, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage,int index, VkShaderModule* module,Internal_ID device)
     {
         char name[256];
@@ -232,13 +230,22 @@ namespace RHI
     }
     RESULT Device::ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle)
     {
-        VkMemoryGetWin32HandleInfoKHR info;
         vTexture* vtex = (vTexture*)texture;
+        #ifdef WIN32
+        VkMemoryGetWin32HandleInfoKHR info;
         info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap;
         info.pNext = 0;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         info.handleType = MemFlags(options);
         return vkGetMemoryWin32HandleKHR((VkDevice)ID, &info, handle);
+        #endif
+        VkMemoryGetFdInfoKHR info;
+        info.handleType = MemFlags(options);
+        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap;
+        info.pNext = 0;
+        info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+        return vkGetMemoryFdKHR((VkDevice)ID,&info,handle);
+
     }
     RESULT Device::QueueWaitIdle(CommandQueue* queue)
     {
@@ -313,7 +320,7 @@ namespace RHI
         Hold();
         ((vCommandAllocator*)allocator)->m_pools.push_back(vCommandlist->ID);
         
-        return 0;
+        return res;
     }
     VkDescriptorType DescType(RHI::DescriptorType type)
     {
@@ -335,7 +342,7 @@ namespace RHI
             break;
         case RHI::DescriptorType::CSBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             break;
-        default:
+        default: return VK_DESCRIPTOR_TYPE_MAX_ENUM;
             break;
         }
     }
@@ -365,7 +372,7 @@ namespace RHI
             poolInfo.pPoolSizes = poolSize;
             poolInfo.maxSets = desc->maxDescriptorSets;
 
-            VkResult res = vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
+            vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
         }
         *descriptorHeap = vdescriptorHeap;
         return 0;
@@ -415,6 +422,7 @@ namespace RHI
             return sizeof(VkImageView);
         if (type == RHI::DescriptorType::Sampler)
             return sizeof(VkSampler);
+        return 0;
     }
     RESULT Device::GetSwapChainImage(SwapChain* swapchain, std::uint32_t index, Texture** texture)
     {
@@ -589,7 +597,7 @@ namespace RHI
         //VkPushConstantRange pushConstantRanges[5];
         VkDescriptorSetLayoutCreateInfo layoutInfo[20]{};
         
-        uint32_t minSetIndex = UINT32_MAX;
+        //uint32_t minSetIndex = UINT32_MAX;
         uint32_t numLayouts = 0;
         for (uint32_t i = 0; i < desc->numRootParameters; i++)
         {
@@ -651,7 +659,7 @@ namespace RHI
             }
             vSetLayouts[i].ID = descriptorSetLayout[i];
         }
-        return RESULT();
+        return res;
     }
     const VkCompareOp vkCompareFunc(RHI::ComparisonFunc func)
     {
@@ -673,7 +681,7 @@ namespace RHI
             break;
         case RHI::ComparisonFunc::Always: return VK_COMPARE_OP_ALWAYS;
             break;
-        default:
+        default: return VK_COMPARE_OP_MAX_ENUM;
             break;
         }
     }
@@ -697,7 +705,7 @@ namespace RHI
             break;
         case RHI::StencilOp::Decr: return VK_STENCIL_OP_DECREMENT_AND_WRAP;
             break;
-        default:
+        default: return VK_STENCIL_OP_MAX_ENUM;
             break;
         }
     }
@@ -766,7 +774,7 @@ namespace RHI
         }
         VkVertexInputAttributeDescription inputAttribDesc[5];
         VkVertexInputBindingDescription inputbindingDesc[5];
-        for (int i = 0; i < desc->numInputElements ; i++)
+        for (uint32_t i = 0; i < desc->numInputElements ; i++)
         {
             inputAttribDesc[i].format = FormatConv(desc->inputElements[i].format);
             inputAttribDesc[i].location = desc->inputElements[i].location;
@@ -774,7 +782,7 @@ namespace RHI
             inputAttribDesc[i].binding = desc->inputElements[i].inputSlot;
 
         }
-        for (int i = 0; i < desc->numInputBindings; i++)
+        for (uint32_t i = 0; i < desc->numInputBindings; i++)
         {
             inputbindingDesc[i].binding = i;
             inputbindingDesc[i].inputRate = (VkVertexInputRate)desc->inputBindings[i].inputRate;
@@ -801,7 +809,7 @@ namespace RHI
 
         VkPipelineDynamicStateCreateInfo dynamicState{};
         dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        dynamicState.dynamicStateCount = _ARRAYSIZE(dynamicStates);
+        dynamicState.dynamicStateCount = ARRAYSIZE(dynamicStates);
         dynamicState.pDynamicStates = dynamicStates;
 
         VkPipelineViewportStateCreateInfo viewportState{};
@@ -1015,11 +1023,13 @@ namespace RHI
         if (type == TextureType::Texture1D) return VK_IMAGE_TYPE_1D;
         if (type == TextureType::Texture2D) return VK_IMAGE_TYPE_2D;
         if (type == TextureType::Texture3D) return VK_IMAGE_TYPE_3D;
+        return VK_IMAGE_TYPE_MAX_ENUM;
     }
     VkImageTiling ImageTiling(TextureTilingMode mode)
     {
         if (mode == TextureTilingMode::Linear) return VK_IMAGE_TILING_LINEAR;
         if (mode == TextureTilingMode::Optimal) return VK_IMAGE_TILING_OPTIMAL;
+        return VK_IMAGE_TILING_MAX_ENUM;
     }
     VkImageUsageFlags ImageUsage(RHI::TextureUsage usage)
     {
@@ -1169,7 +1179,7 @@ namespace RHI
             break;
         case RHI::TextureViewType::TextureCube: return VK_IMAGE_VIEW_TYPE_CUBE;
             break;
-        default:
+        default: return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
             break;
         }
     }
@@ -1209,7 +1219,7 @@ namespace RHI
             break;
         case RHI::AddressMode::Wrap: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
             break;
-        default:
+        default: return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
             break;
         }
     }

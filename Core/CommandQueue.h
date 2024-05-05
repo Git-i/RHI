@@ -18,7 +18,7 @@ namespace RHI
 	};
 	struct CommandQueueDesc
 	{
-		CommandListType CommandListType;
+		CommandListType commandListType;
 		float Priority;
 		int _unused = 0;
 	};

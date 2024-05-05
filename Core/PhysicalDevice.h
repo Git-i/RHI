@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.h"
+#include "Object.h"
 namespace RHI
 {
 	struct LUID
@@ -9,8 +9,8 @@ namespace RHI
 	struct PhysicalDeviceDesc
 	{
 		wchar_t  Description[128];
-		SIZE_T DedicatedVideoMemory;
-		SIZE_T SharedSystemMemory;
+		std::size_t DedicatedVideoMemory;
+		std::size_t SharedSystemMemory;
 		LUID   AdapterLuid;
 	};
 	class RHI_API PhysicalDevice

@@ -3,6 +3,7 @@
 #include "volk.h"
 namespace RHI
 {
+	#ifdef WIN32
 	void RHI::Surface::InitWin32(HWND hwnd, Internal_ID instance)
 	{
 		VkWin32SurfaceCreateInfoKHR createInfo{};
@@ -11,4 +12,5 @@ namespace RHI
 		createInfo.hinstance = GetModuleHandle(nullptr);
 		vkCreateWin32SurfaceKHR((VkInstance)instance, &createInfo, nullptr, (VkSurfaceKHR*)&ID);
 	}
+	#endif
 }

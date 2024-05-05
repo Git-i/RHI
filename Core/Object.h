@@ -12,8 +12,8 @@ namespace RHI
 		int Hold();
 		int Release();
 		int GetRefCount();
-		Internal_ID ID = NULL;
+		Internal_ID ID = nullptr;
 		virtual void Destroy() {};
-		void* device = NULL;
+		void* device = nullptr;
 	};
 }
