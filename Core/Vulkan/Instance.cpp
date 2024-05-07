@@ -7,6 +7,9 @@
 #include <iostream>
 #include <numeric> //for itoa
 #include <array>
+#ifdef USE_GLFW
+#include <GLFW/glfw3.h>
+#endif
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -55,13 +58,21 @@ extern "C"
 		{
 			"VK_LAYER_KHRONOS_validation",
 		};
-		const char* extensionName[4] = { "VK_KHR_surface", "VK_KHR_win32_surface",VK_EXT_DEBUG_UTILS_EXTENSION_NAME,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
+		
+		std::vector<const char*> extensionName = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
+		#ifdef VK_USE_PLATFORM_WIN32_KHR
+			extensionName.push_back("VK_KHR_surface", "VK_KHR_win32_surface");
+		#elif defined(USE_GLFW)
+			uint32_t count;
+			const char ** ext = glfwGetRequiredInstanceExtensions(&count);
+			for(uint32_t i = 0; i < count; i++) extensionName.push_back(ext[i]);
+		#endif
 		info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		info.pNext = &features;
 		info.enabledLayerCount = ARRAYSIZE(layerNames);
 		info.ppEnabledLayerNames = layerNames;
-		info.enabledExtensionCount = ARRAYSIZE(extensionName);
-		info.ppEnabledExtensionNames = extensionName;
+		info.enabledExtensionCount = extensionName.size();
+		info.ppEnabledExtensionNames = extensionName.data();
 		info.pApplicationInfo = &appInfo;
 		VkResult res = vkCreateInstance(&info, nullptr, (VkInstance*)&vinstance->ID);
 		volkLoadInstance((VkInstance)vinstance->ID);

@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "../Surface.h"
 #include "volk.h"
+#include "../Surface.h"
 namespace RHI
 {
 	#ifdef WIN32
@@ -11,6 +11,17 @@ namespace RHI
 		createInfo.hwnd = hwnd;
 		createInfo.hinstance = GetModuleHandle(nullptr);
 		vkCreateWin32SurfaceKHR((VkInstance)instance, &createInfo, nullptr, (VkSurfaceKHR*)&ID);
+	}
+	#endif
+	#ifdef __linux__
+	//void RHI::Surface::InitLinux()
+	//{
+	//}
+	#endif
+	#ifdef USE_GLFW
+	void RHI::Surface::InitGLFW(GLFWwindow* window, Internal_ID instance)
+	{
+		glfwCreateWindowSurface((VkInstance)instance, window, nullptr, (VkSurfaceKHR*)&ID);
 	}
 	#endif
 }
