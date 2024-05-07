@@ -23,7 +23,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	size_t ind = view.find(id_string);
 	ind += strlen(id_string);
 	std::cerr << std::endl << "validation layer" << pCallbackData->pMessage + ind << std::endl;
-	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != 101294395 && pCallbackData->messageIdNumber != 0x4dae5635)
+	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != -937765618 && pCallbackData->messageIdNumber != 0x4dae5635)
 	{
 		DEBUG_BREAK;
 	}
@@ -59,9 +59,9 @@ extern "C"
 			"VK_LAYER_KHRONOS_validation",
 		};
 		
-		std::vector<const char*> extensionName = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
+		std::vector<const char*> extensionName = { "VK_KHR_surface",VK_EXT_DEBUG_UTILS_EXTENSION_NAME,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
 		#ifdef VK_USE_PLATFORM_WIN32_KHR
-			extensionName.push_back("VK_KHR_surface", "VK_KHR_win32_surface");
+			extensionName.push_back("VK_KHR_win32_surface");
 		#elif defined(USE_GLFW)
 			uint32_t count;
 			const char ** ext = glfwGetRequiredInstanceExtensions(&count);
@@ -116,6 +116,7 @@ namespace RHI
 		vSwapChain* vswapChain = new vSwapChain;
 		VkSwapchainCreateInfoKHR createInfo{};
 		std::uint32_t count;
+
 		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, nullptr);
 		std::vector<VkSurfaceFormatKHR> format(count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, format.data());
@@ -144,14 +145,16 @@ namespace RHI
 
 		createInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		createInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+		createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
 		createInfo.clipped = VK_TRUE;
 
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 		VkResult res = vkCreateSwapchainKHR((VkDevice)Device->ID, &createInfo, nullptr, (VkSwapchainKHR*)&vswapChain->ID);
 		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		vkCreateSemaphore((VkDevice)Device->ID, &semaphoreInfo, nullptr, (VkSemaphore*)&vswapChain->present_semaphore);
+		vswapChain->present_semaphore.resize(desc->BufferCount);
+		for(uint32_t i = 0; i < desc->BufferCount; i++)
+			vkCreateSemaphore((VkDevice)Device->ID, &semaphoreInfo, nullptr, &vswapChain->present_semaphore[i]);
 		vswapChain->device = Device;
 		Device->Hold();
 		vkGetDeviceQueue((VkDevice)Device->ID, indices.presentIndex, 0, (VkQueue*)&vswapChain->PresentQueue_ID);

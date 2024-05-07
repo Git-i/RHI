@@ -21,7 +21,7 @@ namespace RHI
 	#ifdef USE_GLFW
 	void RHI::Surface::InitGLFW(GLFWwindow* window, Internal_ID instance)
 	{
-		glfwCreateWindowSurface((VkInstance)instance, window, nullptr, (VkSurfaceKHR*)&ID);
+		VkResult res = glfwCreateWindowSurface((VkInstance)instance, window, nullptr, (VkSurfaceKHR*)&ID);
 	}
 	#endif
 }

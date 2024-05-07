@@ -235,7 +235,7 @@ namespace RHI
             ((vDevice*)device)->Release();
         }
     public:
-        VkSemaphore present_semaphore;
+        std::vector<VkSemaphore> present_semaphore;
         VkQueue PresentQueue_ID;
     };
     class vShaderReflection : public ShaderReflection

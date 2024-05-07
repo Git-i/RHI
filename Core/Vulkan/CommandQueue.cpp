@@ -40,6 +40,8 @@ namespace RHI
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.pNext = &timelineInfo;
 		submitInfo.waitSemaphoreCount = 1;
+		VkPipelineStageFlags fg = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		submitInfo.pWaitDstStageMask = &fg;
 		submitInfo.pWaitSemaphores = (VkSemaphore*)&fence->ID;
 		return vkQueueSubmit((VkQueue)ID, 1, &submitInfo, VK_NULL_HANDLE);
 	}

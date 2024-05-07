@@ -10,8 +10,8 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(SwapChain);
 	public:
-		RESULT Present(std::uint32_t imgIndex);
-		RESULT AcquireImage(std::uint32_t imgIndex);
+		RESULT Present(std::uint32_t imgIndex,std::uint32_t cycle);
+		RESULT AcquireImage(std::uint32_t* imgIndex, std::uint32_t cycle);
 
 	};
 	struct RHI_API SwapChainDesc
