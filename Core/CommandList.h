@@ -34,11 +34,11 @@ namespace RHI
 		RESULT ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
 		RESULT SetPipelineState(PipelineStateObject* pso);
 		RESULT SetComputePipeline(ComputePipeline* cp);
-		RESULT BindComputeDescriptorSet(RootSignature* rs, DescriptorSet* set, std::uint32_t setIndex);
-		RESULT BindComputeDynamicDescriptor(RootSignature* rs, const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
+		RESULT BindComputeDescriptorSet(DescriptorSet* set, std::uint32_t setIndex);
+		RESULT BindComputeDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
 		RESULT SetDescriptorHeap(DescriptorHeap* heap);
-		RESULT BindDescriptorSet(RootSignature* rs, DescriptorSet* set, std::uint32_t setIndex);
-		RESULT BindDynamicDescriptor(RootSignature* rs, const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
+		RESULT BindDescriptorSet(DescriptorSet* set, std::uint32_t setIndex);
+		RESULT BindDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
 		RESULT SetScissorRects(uint32_t numRects, Area2D* rects);
 		RESULT SetViewports(uint32_t numViewports, Viewport* viewports);
 		RESULT CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Buffer* srcBuffer, Buffer* dstBuffer);
@@ -51,6 +51,7 @@ namespace RHI
 		RESULT BindIndexBuffer(const Buffer* buffer, uint32_t offset);
 		RESULT SetRootSignature(RootSignature* rs);
 		RESULT EndRendering();
+		RESULT PushConstant(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
 		//todo
 		RESULT BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset);
 		RESULT MarkBuffer(Buffer* buffer, uint32_t offset, uint32_t val);

@@ -42,6 +42,9 @@ namespace RHI
 	struct PushConstant
 	{
 		std::uint32_t numConstants;
+		std::uint32_t offset;
+		std::uint32_t bindingIndex;
+		ShaderStage stage;
 	};
 	enum class RootParameterType
 	{

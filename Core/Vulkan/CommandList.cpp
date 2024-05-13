@@ -156,6 +156,12 @@ namespace RHI
         vkCmdBeginRenderingKHR((VkCommandBuffer)ID, &info);
         return RESULT();
     }
+    RESULT GraphicsCommandList::PushConstant(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
+    {
+        vRootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        vkCmdPushConstants((VkCommandBuffer)ID,(VkPipelineLayout)rs->ID,rs->pcBindingToStage[bindingIndex], offsetIn32BitSteps * sizeof(uint32_t), numConstants * sizeof(uint32_t), constants);
+        return RESULT();
+    }
     RESULT GraphicsCommandList::EndRendering()
     {
         vkCmdEndRenderingKHR((VkCommandBuffer)ID);
@@ -209,20 +215,23 @@ namespace RHI
     }
     RESULT GraphicsCommandList::SetRootSignature(RootSignature* rs)
     {
+        ((vGraphicsCommandList*)this)->currentRS = (vRootSignature*)rs;
         return RESULT();
         
     }
-    RESULT GraphicsCommandList::BindDynamicDescriptor(RootSignature* rs, const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
+    RESULT GraphicsCommandList::BindDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets,1,&offset);
         return 0;
     }
-    RESULT GraphicsCommandList::BindDescriptorSet(RootSignature* rs, DescriptorSet* set, std::uint32_t setIndex)
+    RESULT GraphicsCommandList::BindDescriptorSet(DescriptorSet* set, std::uint32_t setIndex)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
         return RESULT();
     }
@@ -366,17 +375,19 @@ namespace RHI
         vkCmdBindPipeline((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipeline)cp->ID);
         return RESULT();
     }
-    RESULT GraphicsCommandList::BindComputeDescriptorSet(RootSignature* rs, DescriptorSet* set, std::uint32_t setIndex)
+    RESULT GraphicsCommandList::BindComputeDescriptorSet(DescriptorSet* set, std::uint32_t setIndex)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
         return RESULT();
     }
-    RESULT GraphicsCommandList::BindComputeDynamicDescriptor(RootSignature* rs, const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
+    RESULT GraphicsCommandList::BindComputeDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 1, &offset);
         return 0;
     }

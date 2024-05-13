@@ -20,6 +20,7 @@
 #include "../DebugBuffer.h"
 #include "VulkanAfterCrash.h"
 #include <algorithm>//for std::find
+#include <unordered_map>
 namespace RHI
 {
     //todo find a better of doing this, because this would make the rhi single-device(gpu)
@@ -98,20 +99,7 @@ namespace RHI
         }
         std::vector<Internal_ID> m_pools;
     };
-    class vGraphicsCommandList : public GraphicsCommandList
-    {
-    public:
-        void Destroy() override
-        {
-            if (auto pos = std::find(allocator->m_pools.begin(), allocator->m_pools.end(), ID); pos != allocator->m_pools.end())
-            {
-                allocator->m_pools.erase(pos);
-            }
-            vkFreeCommandBuffers((VkDevice)((vDevice*)device)->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
-            ((vDevice*)device)->Release();
-        }
-        vCommandAllocator* allocator;
-    };
+    
     class vTextureView : public TextureView
     {
     };
@@ -177,6 +165,22 @@ namespace RHI
             vkDestroyPipelineLayout((VkDevice)((vDevice*)device)->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        std::unordered_map<uint32_t, VkShaderStageFlags> pcBindingToStage;
+    };
+    class vGraphicsCommandList : public GraphicsCommandList
+    {
+    public:
+        void Destroy() override
+        {
+            if (auto pos = std::find(allocator->m_pools.begin(), allocator->m_pools.end(), ID); pos != allocator->m_pools.end())
+            {
+                allocator->m_pools.erase(pos);
+            }
+            vkFreeCommandBuffers((VkDevice)((vDevice*)device)->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
+            ((vDevice*)device)->Release();
+        }
+        vCommandAllocator* allocator;
+        vRootSignature* currentRS = nullptr;
     };
     class vPipelineStateObject : public PipelineStateObject
     {

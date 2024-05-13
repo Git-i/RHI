@@ -15,7 +15,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData) {
-
+	if(pCallbackData->messageIdNumber == 0 || pCallbackData->messageIdNumber == -937765618) return VK_FALSE;
 	std::string_view view(pCallbackData->pMessage);
 	char id_string[1024];
 	strcpy(id_string, "MessageID = 0x");
@@ -111,12 +111,17 @@ namespace RHI
 		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
 		return count;
 	}
+	std::pair<uint32_t, uint32_t> Instance::GetSwapChainMinMaxImageCount(PhysicalDevice* pDev, Surface* surface)
+	{
+		VkSurfaceCapabilitiesKHR caps;
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR((VkPhysicalDevice)pDev->ID,(VkSurfaceKHR)surface->ID,&caps);
+		return {caps.minImageCount, caps.maxImageCount};
+	}
 	RESULT Instance::CreateSwapChain(SwapChainDesc* desc, PhysicalDevice* pDevice, Device* Device, CommandQueue* pCommandQueue, SwapChain** pSwapChain)
 	{
 		vSwapChain* vswapChain = new vSwapChain;
 		VkSwapchainCreateInfoKHR createInfo{};
 		std::uint32_t count;
-
 		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, nullptr);
 		std::vector<VkSurfaceFormatKHR> format(count);
 		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, format.data());

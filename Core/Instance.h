@@ -12,6 +12,7 @@ namespace RHI
 	public:
 		API GetInstanceAPI();
 		uint32_t GetNumPhysicalDevices();
+		std::pair<uint32_t, uint32_t> GetSwapChainMinMaxImageCount(PhysicalDevice* pDev, Surface* surface);
 		RESULT GetAllPhysicalDevices(PhysicalDevice** devices);
 		RESULT GetPhysicalDevice(int id, PhysicalDevice** device);
 		RESULT CreateSwapChain(SwapChainDesc* desc, PhysicalDevice* device, Device* pDevice, CommandQueue* pCommandQueue, SwapChain** pSwapChain);

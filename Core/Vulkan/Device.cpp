@@ -594,11 +594,13 @@ namespace RHI
         vDescriptorSetLayout* vSetLayouts = new vDescriptorSetLayout[desc->numRootParameters];
         vRootSignature* vrootSignature = new vRootSignature;
         VkDescriptorSetLayout descriptorSetLayout[20];
-        //VkPushConstantRange pushConstantRanges[5];
         VkDescriptorSetLayoutCreateInfo layoutInfo[20]{};
+        
+        VkPushConstantRange pushConstantRanges[20];
         
         //uint32_t minSetIndex = UINT32_MAX;
         uint32_t numLayouts = 0;
+        uint32_t pcIndex = 0;
         for (uint32_t i = 0; i < desc->numRootParameters; i++)
         {
             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
@@ -611,30 +613,41 @@ namespace RHI
                 binding.descriptorType = DescType(desc->rootParameters[i].dynamicDescriptor.type);
                 binding.pImmutableSamplers = nullptr;
                 binding.stageFlags = VkShaderStage(desc->rootParameters[i].dynamicDescriptor.stage);
-                layoutInfo[i].bindingCount = 1;
-                layoutInfo[i].pBindings = &binding;
-                layoutInfo[i].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[i], nullptr, &descriptorSetLayout[i]);
-                continue;
-            }
-            VkDescriptorSetLayoutBinding LayoutBinding[20] = {};
-            for (uint32_t j = 0; j < desc->rootParameters[i].descriptorTable.numDescriptorRanges; j++)
-            {
-                LayoutBinding[j].binding = desc->rootParameters[i].descriptorTable.ranges[j].BaseShaderRegister;
-                LayoutBinding[j].descriptorCount = desc->rootParameters[i].descriptorTable.ranges[j].numDescriptors;
-                LayoutBinding[j].descriptorType = DescType(desc->rootParameters[i].descriptorTable.ranges[j].type);
-                LayoutBinding[j].pImmutableSamplers = nullptr;
-                LayoutBinding[j].stageFlags = VkShaderStage(desc->rootParameters[i].descriptorTable.ranges[j].stage);
+                layoutInfo[numLayouts].bindingCount = 1;
+                layoutInfo[numLayouts].pBindings = &binding;
+                layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
                 numLayouts++;
             }
-            layoutInfo[i].bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
-            layoutInfo[i].pBindings = LayoutBinding;
-            layoutInfo[i].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[i], nullptr, &descriptorSetLayout[i]);
-            pSetLayouts[i] = &vSetLayouts[i];
-            vSetLayouts[i].device = this;
+            else if(desc->rootParameters[i].type == RootParameterType::PushConstant)
+            {
+                pushConstantRanges[pcIndex].offset = desc->rootParameters[i].pushConstant.offset;
+                pushConstantRanges[pcIndex].size = desc->rootParameters[i].pushConstant.numConstants * sizeof(uint32_t);
+                pushConstantRanges[pcIndex].stageFlags = vrootSignature->pcBindingToStage[desc->rootParameters[i].pushConstant.bindingIndex] =
+                VkShaderStage(desc->rootParameters[i].pushConstant.stage);
+                pcIndex++;
+            }
+            else if(desc->rootParameters[i].type == RootParameterType::DescriptorTable)
+            {
+                VkDescriptorSetLayoutBinding LayoutBinding[20] = {};
+                for (uint32_t j = 0; j < desc->rootParameters[i].descriptorTable.numDescriptorRanges; j++)
+                {
+                    LayoutBinding[j].binding = desc->rootParameters[i].descriptorTable.ranges[j].BaseShaderRegister;
+                    LayoutBinding[j].descriptorCount = desc->rootParameters[i].descriptorTable.ranges[j].numDescriptors;
+                    LayoutBinding[j].descriptorType = DescType(desc->rootParameters[i].descriptorTable.ranges[j].type);
+                    LayoutBinding[j].pImmutableSamplers = nullptr;
+                    LayoutBinding[j].stageFlags = VkShaderStage(desc->rootParameters[i].descriptorTable.ranges[j].stage);
+                }
+                layoutInfo[numLayouts].bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
+                layoutInfo[numLayouts].pBindings = LayoutBinding;
+                layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                pSetLayouts[numLayouts] = &vSetLayouts[numLayouts];
+                vSetLayouts[numLayouts].device = this;
+                numLayouts++;
+            }
         }
-        VkDescriptorSetLayout layoutInfoSorted[5]{};
+        VkDescriptorSetLayout layoutInfoSorted[20]{};
         //sort descriptor sets
         for (uint32_t i = 0; i < desc->numRootParameters; i++)
         {
@@ -645,8 +658,11 @@ namespace RHI
         }
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = desc->numRootParameters;
+        pipelineLayoutInfo.setLayoutCount = numLayouts;
         pipelineLayoutInfo.pSetLayouts = layoutInfoSorted;
+        pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
+        pipelineLayoutInfo.pushConstantRangeCount = pcIndex;
+        
         VkResult res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
         vrootSignature->device = this;
         *rootSignature = vrootSignature;
