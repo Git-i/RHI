@@ -431,6 +431,7 @@ namespace RHI
         std::vector<VkImage> images(img);
         VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
         (vtexture)->ID = images[index];
+        vtexture->device = this;
         *texture = vtexture;
         return res;
     }

@@ -21,6 +21,7 @@
 #include "VulkanAfterCrash.h"
 #include <algorithm>//for std::find
 #include <unordered_map>
+#include <vulkan/vulkan_core.h>
 namespace RHI
 {
     //todo find a better of doing this, because this would make the rhi single-device(gpu)
@@ -53,6 +54,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroyDevice((VkDevice)ID, nullptr);
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_DEVICE;
+        }
     public:
         std::vector<HeapProperties> HeapProps;
         VmaAllocator allocator;
@@ -82,6 +87,10 @@ namespace RHI
             vkDestroyBuffer( (VkDevice) ((vDevice*)device)->ID, (VkBuffer)Buffer::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_BUFFER;
+        }
     };
     
     class vCommandAllocator : public CommandAllocator
@@ -97,19 +106,33 @@ namespace RHI
             vkDestroyCommandPool((VkDevice)((vDevice*)device)->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_COMMAND_POOL;
+        }
         std::vector<Internal_ID> m_pools;
     };
     
     class vTextureView : public TextureView
     {
+        public:
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_IMAGE_VIEW;
+        }
     };
     class vDebugBuffer : public DebugBuffer
     {
     public:
         uint32_t* data;
+        
     };
     class vCommandQueue : public CommandQueue
     {
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_QUEUE;
+        }
     };
     
     class vDynamicDescriptor : public DynamicDescriptor
@@ -125,6 +148,10 @@ namespace RHI
             vkDestroyDescriptorPool((VkDevice)((vDevice*)device)->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_DESCRIPTOR_POOL;
+        }
     };
     class vFence : public Fence
     {
@@ -134,6 +161,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroySemaphore((VkDevice)((vDevice*)device)->ID, (VkSemaphore)Fence::ID, nullptr);
             ((vDevice*)device)->Release();
+        }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_SEMAPHORE;
         }
     };
     class vHeap : public Heap
@@ -145,6 +176,10 @@ namespace RHI
             vkFreeMemory((VkDevice)((vDevice*)device)->ID, (VkDeviceMemory)Heap::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_DEVICE_MEMORY;
+        }
     };
     class vDescriptorSetLayout : public DescriptorSetLayout
     {
@@ -155,6 +190,10 @@ namespace RHI
             vkDestroyDescriptorSetLayout((VkDevice)((vDevice*)device)->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
+        }
     };
     class vRootSignature : public RootSignature
     {
@@ -164,6 +203,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroyPipelineLayout((VkDevice)((vDevice*)device)->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
             ((vDevice*)device)->Release();
+        }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_PIPELINE_LAYOUT;
         }
         std::unordered_map<uint32_t, VkShaderStageFlags> pcBindingToStage;
     };
@@ -179,6 +222,10 @@ namespace RHI
             vkFreeCommandBuffers((VkDevice)((vDevice*)device)->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_COMMAND_BUFFER;
+        }
         vCommandAllocator* allocator;
         vRootSignature* currentRS = nullptr;
     };
@@ -191,6 +238,10 @@ namespace RHI
             vkDestroyPipeline((VkDevice)((vDevice*)device)->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_PIPELINE;
+        }
     };
     class vComputePipeline : public ComputePipeline
     {
@@ -200,6 +251,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroyPipeline((VkDevice)((vDevice*)device)->ID, (VkPipeline)ComputePipeline::ID, nullptr);
             ((vDevice*)device)->Release();
+        }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_PIPELINE;
         }
     };
     class vDescriptorSet : public DescriptorSet
@@ -214,6 +269,10 @@ namespace RHI
             vkDestroyImage((VkDevice)((vDevice*)device)->ID, (VkImage)Texture::ID, nullptr);
             ((vDevice*)device)->Release();
         }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_IMAGE;
+        }
     };
     class vInstance : public Instance
     {
@@ -224,6 +283,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroyInstance((VkInstance)Instance::ID, nullptr);
             ((vDevice*)device)->Release();
+        }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_INSTANCE;
         }
     };
     class vPhysicalDevice : public PhysicalDevice
@@ -237,6 +300,10 @@ namespace RHI
             delete Object::refCnt;
             vkDestroySwapchainKHR((VkDevice)((vDevice*)device)->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
             ((vDevice*)device)->Release();
+        }
+        virtual int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         }
     public:
         std::vector<VkSemaphore> present_semaphore;
