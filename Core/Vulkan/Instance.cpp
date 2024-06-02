@@ -23,9 +23,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	size_t ind = view.find(id_string);
 	ind += strlen(id_string);
 	std::cerr << std::endl << "validation layer" << pCallbackData->pMessage + ind << std::endl;
-	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != -937765618)// && pCallbackData->messageIdNumber != 0x4dae5635)
+	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != -937765618 && pCallbackData->messageIdNumber!=-1831440447)// && pCallbackData->messageIdNumber != 0x4dae5635)
 	{
-		DEBUG_BREAK;
+		//DEBUG_BREAK;
 	}
 
 	return VK_FALSE;
@@ -88,7 +88,14 @@ extern "C"
 }
 namespace RHI
 {
-
+	RHI::Instance* Instance::FromNativeHandle(Internal_ID id)
+	{
+		RHI::vInstance* inst = new RHI::vInstance;
+		inst->ID = id;
+		volkInitialize();
+		volkLoadInstance((VkInstance)inst->ID);
+		return inst;
+	}
 	RESULT Instance::GetPhysicalDevice(int id, PhysicalDevice** device)
 	{
 		vPhysicalDevice* vdevice = new vPhysicalDevice;

@@ -1,9 +1,15 @@
 #include "pch.h"
 #include "../PhysicalDevice.h"
-#include "volk.h"
+#include "VulkanSpecific.h"
 #include <string>
 namespace RHI
 {
+	RHI::PhysicalDevice* PhysicalDevice::FromNativeHandle(Internal_ID id)
+	{
+		vPhysicalDevice* dev = new vPhysicalDevice;
+		dev->ID = id;
+		return dev;
+	}
     RESULT PhysicalDevice::GetDesc(PhysicalDeviceDesc* returnVal)
     {
 		VkPhysicalDeviceIDProperties id_props{};

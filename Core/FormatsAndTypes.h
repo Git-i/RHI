@@ -3,6 +3,22 @@
 
 namespace RHI
 {
+	enum QueueFamilyIndicesFlags
+    {
+        HasGraphics = 1 << 1,
+        HasCompute = 1 << 2,
+        HasPresent = 1 << 3,
+        HasCopy = 1 << 4
+    };
+    DEFINE_ENUM_FLAG_OPERATORS(QueueFamilyIndicesFlags);
+    struct QueueFamilyIndices
+    {
+        std::uint32_t graphicsIndex;
+        std::uint32_t computeIndex;
+        std::uint32_t copyIndex;
+        std::uint32_t presentIndex;
+        QueueFamilyIndicesFlags flags;
+    };
 	enum class ExportOptions
 	{
 		D3D11TextureNT,

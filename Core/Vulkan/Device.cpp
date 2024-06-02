@@ -3,6 +3,7 @@
 #include "../../Error.h"
 #include "VulkanSpecific.h"
 #include "volk.h"
+#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #define VULKAN_AFTER_CRASH_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 1
@@ -169,6 +170,45 @@ extern "C"
 }
 namespace RHI
 {   
+    RHI::Device* Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
+    {
+        VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)phys_device;
+        VkPhysicalDeviceMemoryProperties memProps;
+        RHI::vDevice* vdevice = new RHI::vDevice;
+        vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
+        for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+        {
+            VkFlags flags = memProps.memoryTypes[i].propertyFlags;
+            RHI::HeapProperties prop;
+            prop.type = RHI::HeapType::Custom;
+            prop.memoryLevel = (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? RHI::MemoryLevel::DedicatedRAM : RHI::MemoryLevel::SharedRAM;
+            RHI::CPUPageProperty CPUprop;
+            if (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) CPUprop = RHI::CPUPageProperty::WriteCached;
+            else if (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) CPUprop = RHI::CPUPageProperty::WriteCombined;
+            else CPUprop = RHI::CPUPageProperty::NonVisible;
+            prop.pageProperty = CPUprop;
+            vdevice->HeapProps.emplace_back(prop);
+        }
+        SelectHeapIndices(vdevice);
+        vdevice->indices = indices;
+        vdevice->ID = id;
+        VmaAllocatorCreateInfo vmaInfo{};
+        vmaInfo.device = (VkDevice)vdevice->ID;
+        vmaInfo.flags = 0; //probably have error checking
+        vmaInfo.instance = (VkInstance)instance;
+        vmaInfo.physicalDevice = vkPhysicalDevice;
+        vmaInfo.pVulkanFunctions = nullptr;
+        vmaInfo.pTypeExternalMemoryHandleTypes = 0;
+        
+        vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
+        VkAfterCrash_DeviceCreateInfo acInfo;
+        acInfo.flags = 0;
+        acInfo.vkDevice = (VkDevice)vdevice->ID;
+        acInfo.vkPhysicalDevice = vkPhysicalDevice;
+        VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
+        vdevice->Hold();//the device doesnt belong to us, so we keep it alive for the external user
+        return vdevice;
+    }
     Default_t Default = {};
     Zero_t Zero = {};
     static VkResult CreateShaderModule(const char* filename, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage,int index, VkShaderModule* module,Internal_ID device)
@@ -228,6 +268,7 @@ namespace RHI
     {
         return 0;
     }
+    
     RESULT Device::ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle)
     {
         vTexture* vtex = (vTexture*)texture;
@@ -431,6 +472,7 @@ namespace RHI
         std::vector<VkImage> images(img);
         VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
         (vtexture)->ID = images[index];
+        Hold();
         vtexture->device = this;
         *texture = vtexture;
         return res;
@@ -932,7 +974,8 @@ namespace RHI
 
         vPSO->device = this;
         Hold();
-        vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
+        VkResult res = vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
+        if(res != VK_SUCCESS)DEBUG_BREAK;
         *pPSO = vPSO;
         for(int i = 0; i < index; i++)
             vkDestroyShaderModule((VkDevice)ID, modules[i], nullptr);
@@ -959,6 +1002,15 @@ namespace RHI
             pSets[i] = &vSets[i];
         }
         return res;
+    }
+    Texture* Device::WrapNativeTexture(Internal_ID id)
+    {
+        RHI::vTexture* vtex = new RHI::vTexture;
+        vtex->ID = id;
+        vtex->Hold();
+        vtex->device = this;
+        Hold();
+        return vtex;
     }
     RESULT Device::UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* sets)
     {

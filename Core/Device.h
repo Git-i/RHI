@@ -59,6 +59,8 @@ namespace RHI
 		RESULT ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle);
 		//This is not staying
 		RESULT QueueWaitIdle(CommandQueue* queue);
+		static RHI::Device* FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance,QueueFamilyIndices indices);
+		RHI::Texture* WrapNativeTexture(Internal_ID id);
 		~Device();
 	};
 	template<> RESULT Device::CreateCommandList<GraphicsCommandList>(CommandListType type, CommandAllocator* allocator, GraphicsCommandList** ppCommandList);

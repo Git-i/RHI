@@ -16,6 +16,7 @@ namespace RHI
 	class RHI_API PhysicalDevice
 	{
 	public:
+		static RHI::PhysicalDevice* FromNativeHandle(Internal_ID id);
 		RESULT GetDesc(PhysicalDeviceDesc* desc);
 		Internal_ID ID;;
 	};

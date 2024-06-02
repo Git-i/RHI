@@ -36,6 +36,8 @@ namespace RHI
         //vkFreeCommandBuffers((VkDevice)Device_ID, (VkCommandPool)(((vGraphicsCommandList*)this)->m_allocator), 1, (VkCommandBuffer*)&ID);
         //vkResetCommandBuffer((VkCommandBuffer)ID, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
         vkAllocateCommandBuffers((VkDevice)((vDevice*)device)->ID, &Info, (VkCommandBuffer*)&ID);
+        if(name) SetName(name);
+        ((vGraphicsCommandList*)this)->allocator = (vCommandAllocator*)allocator;
         ((vCommandAllocator*)allocator)->m_pools.push_back(ID);
         return vkBeginCommandBuffer((VkCommandBuffer)ID, &bufferBeginInfo);
     }

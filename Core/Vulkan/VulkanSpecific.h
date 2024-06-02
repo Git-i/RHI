@@ -24,25 +24,8 @@
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
-    //todo find a better of doing this, because this would make the rhi single-device(gpu)
-    //maybe make it an array or vector of allocators for multiple devices??
     
-    enum QueueFamilyIndicesFlags
-    {
-        HasGraphics = 1 << 1,
-        HasCompute = 1 << 2,
-        HasPresent = 1 << 3,
-        HasCopy = 1 << 4
-    };
-    DEFINE_ENUM_FLAG_OPERATORS(QueueFamilyIndicesFlags);
-    struct QueueFamilyIndices
-    {
-        std::uint32_t graphicsIndex;
-        std::uint32_t computeIndex;
-        std::uint32_t copyIndex;
-        std::uint32_t presentIndex;
-        QueueFamilyIndicesFlags flags;
-    };
+    
 
     std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface = RHI::Surface());
 
@@ -84,7 +67,9 @@ namespace RHI
         virtual void Destroy() override
         {
             delete Object::refCnt;
-            vkDestroyBuffer( (VkDevice) ((vDevice*)device)->ID, (VkBuffer)Buffer::ID, nullptr);
+            if(vma_ID) vmaDestroyBuffer(((vDevice*)device)->allocator, (VkBuffer)ID, vma_ID);
+            else vkDestroyBuffer( (VkDevice) ((vDevice*)device)->ID, (VkBuffer)ID, nullptr);
+            vma_ID = nullptr; ID = nullptr;
             ((vDevice*)device)->Release();
         }
         virtual int32_t GetType() override
@@ -266,7 +251,8 @@ namespace RHI
         virtual void Destroy() override
         {
             delete Object::refCnt;
-            vkDestroyImage((VkDevice)((vDevice*)device)->ID, (VkImage)Texture::ID, nullptr);
+            if(vma_ID) vmaDestroyImage(((vDevice*)device)->allocator, (VkImage)ID, vma_ID);
+            else vkDestroyImage((VkDevice)((vDevice*)device)->ID, (VkImage)Texture::ID, nullptr);
             ((vDevice*)device)->Release();
         }
         virtual int32_t GetType() override
