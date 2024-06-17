@@ -251,20 +251,26 @@ namespace RHI
         vkCmdBindIndexBuffer((VkCommandBuffer)ID, (VkBuffer)buffer->ID, offset, VK_INDEX_TYPE_UINT32);
         return RESULT();
     }
-    RESULT GraphicsCommandList::BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset)
+    RESULT GraphicsCommandList::BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset,SubResourceRange srcRange, SubResourceRange dstRange)
     {
-        VkImageSubresourceLayers lyrs;
-        lyrs.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        lyrs.baseArrayLayer = 0;
-        lyrs.layerCount = 1;
-        lyrs.mipLevel = 0;
+        VkImageSubresourceLayers src_lyrs;
+        src_lyrs.aspectMask = (VkImageAspectFlags)srcRange.imageAspect;
+        src_lyrs.baseArrayLayer = srcRange.FirstArraySlice;
+        src_lyrs.layerCount = srcRange.NumArraySlices;
+        src_lyrs.mipLevel = srcRange.IndexOrFirstMipLevel;
+        VkImageSubresourceLayers dst_lyrs;
+        dst_lyrs.aspectMask = (VkImageAspectFlags)dstRange.imageAspect;
+        dst_lyrs.baseArrayLayer = dstRange.FirstArraySlice;
+        dst_lyrs.layerCount = dstRange.NumArraySlices;
+        dst_lyrs.mipLevel = dstRange.IndexOrFirstMipLevel;
         VkImageBlit blt;
         blt.dstOffsets[0] = { dstOffset.width, dstOffset.height, dstOffset.depth };
         blt.dstOffsets[1] = { (int)(dstOffset.width + dstSize.width), (int)(dstOffset.height + dstSize.height),(int)(dstOffset.depth + dstSize.depth) };
         blt.srcOffsets[0] = { srcOffset.width, srcOffset.height, srcOffset.depth};
         blt.srcOffsets[1] = 
         { (int)(srcOffset.width + srcSize.width), (int)(srcOffset.height + srcSize.height),(int)(srcOffset.depth + srcSize.depth)};
-        blt.srcSubresource = blt.dstSubresource = lyrs;
+        blt.srcSubresource = src_lyrs;
+        blt.dstSubresource = dst_lyrs;
         vkCmdBlitImage((VkCommandBuffer)ID, (VkImage)src->ID, VK_IMAGE_LAYOUT_GENERAL, (VkImage)dst->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blt, VK_FILTER_LINEAR);
         return 0;
     }

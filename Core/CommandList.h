@@ -53,7 +53,7 @@ namespace RHI
 		RESULT EndRendering();
 		RESULT PushConstant(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
 		//todo
-		RESULT BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset);
+		RESULT BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset, SubResourceRange srcRange, SubResourceRange dstRange);
 		RESULT MarkBuffer(Buffer* buffer, uint32_t offset, uint32_t val);
 		RESULT MarkBuffer(DebugBuffer* buffer, uint32_t val);
 		//RESULT SetRenderTargetView(CPU_HANDLE rtv);
