@@ -14,8 +14,8 @@ namespace RHI {
 	{
 		*refCnt -= 1;
 		if (*refCnt <= 0) {
-			this->Destroy();
 			delete name;
+			delete this;
 			return 0;
 		}
 		return *refCnt;
@@ -33,6 +33,6 @@ namespace RHI {
 		name_info.pObjectName = name;
 		name_info.objectHandle = (uint64_t)ID;
 		name_info.objectType = (VkObjectType)GetType();
-		vkSetDebugUtilsObjectNameEXT( (VkDevice)((RHI::Device*)device)->ID, &name_info);
+		vkSetDebugUtilsObjectNameEXT( (VkDevice)(device.retrieve_as<Device>())->ID, &name_info);
 	}
 }

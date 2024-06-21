@@ -7,7 +7,7 @@ namespace RHI
 	void Fence::Wait(std::uint64_t val)
 	{
 		//std::uint64_t curr_val;
-		//vkGetSemaphoreCounterValueKHR((VkDevice)((vDevice*)device)->ID, (VkSemaphore)ID, &curr_val);
+		//vkGetSemaphoreCounterValueKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSemaphore)ID, &curr_val);
 		//if (curr_val >= val)
 		//	return;
 		const uint64_t waitValue = val;
@@ -19,6 +19,6 @@ namespace RHI
 		waitInfo.pSemaphores = (VkSemaphore*)&ID;
 		waitInfo.pValues = &waitValue;
 		
-		vkWaitSemaphoresKHR((VkDevice)((vDevice*)device)->ID, &waitInfo, UINT64_MAX);
+		vkWaitSemaphoresKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, &waitInfo, UINT64_MAX);
 	}
 }

@@ -34,7 +34,10 @@ vulkan_src = [
     'vendor/spirv_reflect/spirv_reflect.cpp'
 ]
 
-deps = []
+ezr = subproject('ezr')
+ezr_dep = ezr.get_variable('ezr_dep')
+
+deps = [ezr_dep]
 if(get_option('API') == 'Vulkan')
 
     deps += dependency('vulkan')

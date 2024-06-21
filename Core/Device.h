@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.h"
+#include "FormatsAndTypes.h"
 #include "PhysicalDevice.h"
 #include "CommandQueue.h"
 #include "CommandAllocator.h"
@@ -14,6 +15,8 @@
 #include "DebugBuffer.h"
 #include "RootSignature.h"
 #include "TextureView.h"
+#include "result.hpp"
+
 namespace RHI
 {
 #ifdef WIN32
@@ -27,32 +30,44 @@ namespace RHI
 		None = 0,
 		ShareAutomaticMemory = 1
 	};
+	enum class CreationError
+	{
+		Unknown = -1,
+		None = 0,
+		OutOfHostMemory = 1,
+		OutOfDeviceMemory = 2,
+		InvalidParameters = 3,
+		FragmentedHeap = 4,
+		OutOfHeapMemory = 5
+	};
+	template<typename T>
+	using creation_result = ezr::result<T, CreationError>;
 	DEFINE_ENUM_FLAG_OPERATORS(DeviceCreateFlags);
 	class RHI_API Device : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Device);
 	public:
-		RESULT CreateCommandAllocators(CommandListType type,uint32_t numAllocators,CommandAllocator** pAllocator);
+		creation_result<Ptr<CommandAllocator>> CreateCommandAllocator(CommandListType type);
 		template<typename T> RESULT CreateCommandList(CommandListType type,CommandAllocator* allocator,T** pCommandList);
-		RESULT CreateDescriptorHeap(DescriptorHeapDesc* desc, DescriptorHeap** descriptorHeap);
-		RESULT CreateDynamicDescriptor(DescriptorHeap* heap, DynamicDescriptor** descriptor, DescriptorType type, ShaderStage stage, RHI::Buffer* buffer,uint32_t offset, uint32_t size);
-		RESULT CreateTextureView(TextureViewDesc* desc, TextureView** view);
+		creation_result<Ptr<DescriptorHeap>> CreateDescriptorHeap(DescriptorHeapDesc* desc);
+		creation_result<Ptr<DynamicDescriptor>> CreateDynamicDescriptor(DescriptorHeap* heap, DescriptorType type, ShaderStage stage, RHI::Buffer* buffer,uint32_t offset, uint32_t size);
+		creation_result<Ptr<TextureView>> CreateTextureView(TextureViewDesc* desc);
 		RESULT CreateDescriptorSets(DescriptorHeap* heap, std::uint32_t numDescriptorSets, DescriptorSetLayout* layouts, DescriptorSet** pSets);
-		RESULT UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* set);
-		RESULT CreateTexture(TextureDesc* desc, Texture** texture, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type);
-		RESULT CreateRenderTargetView(Texture* texture, RenderTargetViewDesc* desc, CPU_HANDLE heapHandle);
-		RESULT CreateDepthStencilView(Texture* texture, DepthStencilViewDesc* desc, CPU_HANDLE heapHandle);
-		RESULT CreateSampler(SamplerDesc* desc, CPU_HANDLE heapHandle);
-		RESULT CreatePipelineStateObject(PipelineStateObjectDesc* desc, PipelineStateObject** pPSO);
-		RESULT CreateComputePipeline(ComputePipelineDesc* desc, ComputePipeline** pCP);
-		RESULT CreateBuffer(BufferDesc* desc, Buffer** buffer, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type);
-		RESULT GetBufferMemoryRequirements(BufferDesc* desc, MemoryReqirements* requirements);
-		RESULT GetTextureMemoryRequirements(TextureDesc* desc, MemoryReqirements* requirements);
-		RESULT CreateRootSignature(RootSignatureDesc* desc, RootSignature** rootSignature, DescriptorSetLayout** pSetLayouts);
-		RESULT CreateHeap(HeapDesc* desc, Heap** heap, bool* usedFallback);
-		RESULT CreateFence(Fence** fence, std::uint64_t val);
-		RESULT CreateDebugBuffer(DebugBuffer** buffer);
+		void UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* set);
+		creation_result<Ptr<Texture>> CreateTexture(TextureDesc* desc, Texture** texture, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type);
+		CreationError CreateRenderTargetView(Texture* texture, RenderTargetViewDesc* desc, CPU_HANDLE heapHandle);
+		CreationError CreateDepthStencilView(Texture* texture, DepthStencilViewDesc* desc, CPU_HANDLE heapHandle);
+		CreationError CreateSampler(SamplerDesc* desc, CPU_HANDLE heapHandle);
+		creation_result<Ptr<PipelineStateObject>> CreatePipelineStateObject(PipelineStateObjectDesc* desc);
+		creation_result<Ptr<ComputePipeline>> CreateComputePipeline(ComputePipelineDesc* desc);
+		creation_result<Ptr<Buffer>> CreateBuffer(BufferDesc* desc, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type);
+		void GetBufferMemoryRequirements(BufferDesc* desc, MemoryReqirements* requirements);
+		void GetTextureMemoryRequirements(TextureDesc* desc, MemoryReqirements* requirements);
+		creation_result<Ptr<RootSignature>> CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts);
+		creation_result<Ptr<Heap>> CreateHeap(HeapDesc* desc, bool* usedFallback);
+		creation_result<Ptr<Fence>> CreateFence(Fence** fence, std::uint64_t val);
+		creation_result<Ptr<DebugBuffer>> CreateDebugBuffer();
 		std::uint32_t GetDescriptorHeapIncrementSize(DescriptorType type);
 		RESULT GetSwapChainImage(SwapChain* swapchain, std::uint32_t index, Texture** texture);
 		RESULT GetMemorySharingCapabilites();
@@ -61,7 +76,7 @@ namespace RHI
 		RESULT QueueWaitIdle(CommandQueue* queue);
 		static RHI::Device* FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance,QueueFamilyIndices indices);
 		RHI::Texture* WrapNativeTexture(Internal_ID id);
-		~Device();
+		~Device(){}
 	};
 	template<> RESULT Device::CreateCommandList<GraphicsCommandList>(CommandListType type, CommandAllocator* allocator, GraphicsCommandList** ppCommandList);
 	const RESULT& vkCompareFunc();

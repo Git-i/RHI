@@ -1,7 +1,16 @@
+#include "CommandAllocator.h"
+#include "DebugBuffer.h"
+#include "DescriptorHeap.h"
+#include "FormatsAndTypes.h"
+#include "PipelineStateObject.h"
+#include "RootSignature.h"
+#include "Texture.h"
+#include "TextureView.h"
 #include "pch.h"
 #include "../Device.h"
 #include "../../Error.h"
 #include "VulkanSpecific.h"
+#include "result.hpp"
 #include "volk.h"
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
@@ -11,6 +20,8 @@
 #include "vk_mem_alloc.h"
 #include <iostream>
 #include <fstream>
+
+using namespace ezr;
 static void SelectHeapIndices(RHI::vDevice* device)
 {
     std::uint32_t DefaultHeap = UINT32_MAX;
@@ -170,6 +181,18 @@ extern "C"
 }
 namespace RHI
 {   
+    CreationError marshall_error(VkResult r)
+    {
+        switch(r)
+        {
+            case(VK_ERROR_OUT_OF_DEVICE_MEMORY): return CreationError::OutOfDeviceMemory;
+            case(VK_ERROR_OUT_OF_HOST_MEMORY): return CreationError::OutOfHostMemory;
+            case(VK_SUCCESS): return CreationError::None;
+            case(VK_ERROR_FRAGMENTED_POOL): return CreationError::FragmentedHeap;
+            case(VK_ERROR_OUT_OF_POOL_MEMORY): return CreationError::OutOfHeapMemory;
+            default: return CreationError::Unknown;
+        }
+    }
     RHI::Device* Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
     {
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)phys_device;
@@ -282,7 +305,7 @@ namespace RHI
         #endif
         VkMemoryGetFdInfoKHR info;
         info.handleType = MemFlags(options);
-        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap;
+        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap.Get();
         info.pNext = 0;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         return vkGetMemoryFdKHR((VkDevice)ID,&info,handle);
@@ -321,9 +344,9 @@ namespace RHI
         }
         return flags;
     }
-    RESULT Device::CreateCommandAllocators(CommandListType type,uint32_t count,CommandAllocator** pAllocator)
+    creation_result<Ptr<CommandAllocator>> Device::CreateCommandAllocator(CommandListType type)
     {
-        vCommandAllocator* vallocator = new vCommandAllocator[3];
+        vCommandAllocator* vallocator = new vCommandAllocator;
         std::uint32_t index = 0;
         if (type == CommandListType::Direct) index = ((vDevice*)this)->indices.graphicsIndex;
         if (type == CommandListType::Compute) index = ((vDevice*)this)->indices.computeIndex;
@@ -333,16 +356,16 @@ namespace RHI
         info.queueFamilyIndex = index;
         info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; //to align with d3d's model
-        VkResult res=VK_SUCCESS;
-        for (uint32_t i = 0; i < count; i++)
+        VkResult res = vkCreateCommandPool((VkDevice)ID, &info, nullptr, (VkCommandPool*)&vallocator->ID);
+        vallocator->device = make_ptr(this);
+        
+        
+        if(res < 0)
         {
-            res = vkCreateCommandPool((VkDevice)ID, &info, nullptr, (VkCommandPool*)&vallocator[i].ID);
-            if (res != VK_SUCCESS) break;
-            vallocator[i].device = this;
-            Hold();
-            pAllocator[i] = &vallocator[i];
+            delete vallocator;
+            return creation_result<Ptr<CommandAllocator>>::err(marshall_error(res));
         }
-        return res;
+        return creation_result<Ptr<CommandAllocator>>::ok(vallocator);
     }
     template <> RESULT Device::CreateCommandList(CommandListType type, CommandAllocator* allocator, GraphicsCommandList** pCommandList)
     {
@@ -355,10 +378,10 @@ namespace RHI
         VkCommandBuffer commandBuffer;
         VkResult res = vkAllocateCommandBuffers((VkDevice)ID, &Info, &commandBuffer);
         vCommandlist->ID = commandBuffer;
-        vCommandlist->device = this;
+        vCommandlist->device = make_ptr(this);
         vCommandlist->allocator = ((vCommandAllocator*)allocator);
         *pCommandList = vCommandlist;
-        Hold();
+        
         ((vCommandAllocator*)allocator)->m_pools.push_back(vCommandlist->ID);
         
         return res;
@@ -387,9 +410,10 @@ namespace RHI
             break;
         }
     }
-    RESULT Device::CreateDescriptorHeap(DescriptorHeapDesc* desc, DescriptorHeap** descriptorHeap)
+    creation_result<Ptr<DescriptorHeap>> Device::CreateDescriptorHeap(DescriptorHeapDesc* desc)
     {
         vDescriptorHeap* vdescriptorHeap = new vDescriptorHeap;
+        VkResult res = VK_SUCCESS;
         if (desc->poolSizes->type == DescriptorType::RTV || desc->poolSizes->type == DescriptorType::DSV)
         {
             vdescriptorHeap->ID = new VkImageView[desc->poolSizes->numDescriptors];
@@ -413,12 +437,16 @@ namespace RHI
             poolInfo.pPoolSizes = poolSize;
             poolInfo.maxSets = desc->maxDescriptorSets;
 
-            vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
+            res = vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
         }
-        *descriptorHeap = vdescriptorHeap;
-        return 0;
+        if(res < 0)
+        {
+            delete vdescriptorHeap;
+            return creation_result<Ptr<DescriptorHeap>>::err(marshall_error(res));
+        }
+        return creation_result<Ptr<DescriptorHeap>>::ok(vdescriptorHeap);
     }
-    RESULT Device::CreateRenderTargetView(Texture* texture, RenderTargetViewDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateRenderTargetView(Texture* texture, RenderTargetViewDesc* desc, CPU_HANDLE heapHandle)
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -435,10 +463,10 @@ namespace RHI
         info.subresourceRange.baseArrayLayer = desc->TextureArray ? desc->arraySlice: 0;
         info.subresourceRange.layerCount = 1;
         info.format = FormatConv(desc->format);
-       return vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr);
+       return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
         
     }
-    RESULT Device::CreateDepthStencilView(Texture* texture, DepthStencilViewDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateDepthStencilView(Texture* texture, DepthStencilViewDesc* desc, CPU_HANDLE heapHandle)
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -455,7 +483,7 @@ namespace RHI
         info.subresourceRange.baseArrayLayer = desc->TextureArray?desc->arraySlice:0;
         info.subresourceRange.layerCount = 1;
         info.format = FormatConv(desc->format);
-        return vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr);
+        return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
     }
     std::uint32_t Device::GetDescriptorHeapIncrementSize(DescriptorType type)
     {
@@ -472,12 +500,12 @@ namespace RHI
         std::vector<VkImage> images(img);
         VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
         (vtexture)->ID = images[index];
-        Hold();
-        vtexture->device = this;
+        
+        vtexture->device = make_ptr(this);
         *texture = vtexture;
         return res;
     }
-    RESULT Device::CreateFence(Fence** fence, std::uint64_t val)
+    creation_result<Ptr<Fence>> Device::CreateFence(Fence** fence, std::uint64_t val)
     {
         vFence* vfence = new vFence;
         VkSemaphoreTypeCreateInfo timelineCreateInfo;
@@ -494,12 +522,16 @@ namespace RHI
         VkSemaphore timelineSemaphore;
         VkResult res = vkCreateSemaphore((VkDevice)ID, &createInfo, NULL, &timelineSemaphore);
         vfence->ID = timelineSemaphore;
-        vfence->device = this;
-        Hold();
-        *fence = vfence;
-        return res;
+        vfence->device = make_ptr(this);
+        
+        if(res < 0)
+        {
+            delete vfence;
+            return creation_result<Ptr<Fence>>::err(marshall_error(res));
+        }
+        return creation_result<Ptr<Fence>>::ok(vfence);
     }
-    RESULT Device::CreateBuffer(BufferDesc* desc, Buffer** buffer, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
+    creation_result<Ptr<Buffer>> Device::CreateBuffer(BufferDesc* desc, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
     {
         vBuffer* vbuffer = new vBuffer;
         VkBufferCreateInfo info{};
@@ -507,7 +539,7 @@ namespace RHI
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         info.size = desc->size;
         info.usage = VkBufferUsage(desc->usage);
-        vbuffer->device = this;
+        vbuffer->device = make_ptr(this);
         if (type == ResourceType::Automatic)
         {
             VmaAllocationCreateInfo allocCreateInfo{};
@@ -517,35 +549,59 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            RESULT res = vmaCreateBuffer(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkBuffer*)&vbuffer->ID, &vbuffer->vma_ID, nullptr);
-            *buffer = vbuffer;
-            Hold();
-            return res;
+            VkResult res = vmaCreateBuffer(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkBuffer*)&vbuffer->ID, &vbuffer->vma_ID, nullptr);
+            
+            if(res < 0)
+            {
+                delete vbuffer;
+                creation_result<Ptr<Buffer>>::err(marshall_error(res));
+            }
+            return creation_result<Ptr<Buffer>>::ok(vbuffer);
         }
         vbuffer->offset = offset;
         vbuffer->size = desc->size;
-        vbuffer->heap = heap->ID;
-        vkCreateBuffer((VkDevice)ID, &info, nullptr, (VkBuffer*)&vbuffer->ID);
+        VkResult res = vkCreateBuffer((VkDevice)ID, &info, nullptr, (VkBuffer*)&vbuffer->ID);
+        if(res < 0)
+        {
+            delete vbuffer;
+            return creation_result<Ptr<Buffer>>::err(marshall_error(res));
+        }
         if (type == ResourceType::Commited)
         {
-            RHI::Heap* iheap;
             RHI::HeapDesc hdesc;
             RHI::MemoryReqirements req;
             GetBufferMemoryRequirements(desc, &req);
             hdesc.props = *props;
             hdesc.size = req.size;
-            CreateHeap(&hdesc, &iheap, nullptr);
-            vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)iheap->ID, 0);
+            auto r = CreateHeap(&hdesc, nullptr);
+            if(r.is_err())
+            {
+                delete vbuffer;
+                return r.transform([](Ptr<Heap>&)->Ptr<Buffer>{return nullptr;});
+            }
+            vbuffer->heap = r.value();
+            res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)vbuffer->heap->ID, 0);
+            if(res < 0)
+            {
+                delete vbuffer;
+                return creation_result<Ptr<Buffer>>::err(marshall_error(res));
+            }
         }
         else if (type == ResourceType::Placed)
         {
-            vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)heap->ID, offset);
+            vbuffer->heap = heap;
+            res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)heap->ID, offset);
+            if(res < 0)
+            {
+                delete vbuffer;
+                return creation_result<Ptr<Buffer>>::err(marshall_error(res));
+            }
         }
-        Hold();
-        *buffer = vbuffer;
-        return RESULT();
+        
+
+        return creation_result<Ptr<Buffer>>::ok(vbuffer);
     }
-    RESULT Device::GetBufferMemoryRequirements(BufferDesc* desc, MemoryReqirements* requirements)
+    void Device::GetBufferMemoryRequirements(BufferDesc* desc, MemoryReqirements* requirements)
     {
         VkBufferCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -561,9 +617,8 @@ namespace RHI
         requirements->alignment = req.memoryRequirements.alignment;
         requirements->size = req.memoryRequirements.size;
         requirements->memoryTypeBits = req.memoryRequirements.memoryTypeBits;
-        return RESULT();
     }
-    RESULT Device::CreateHeap(HeapDesc* desc, Heap** heap, bool* usedFallback)
+    creation_result<Ptr<Heap>> Device::CreateHeap(HeapDesc* desc, bool* usedFallback)
     {
         vHeap* vheap = new vHeap;
         if(usedFallback)*usedFallback = false;
@@ -600,8 +655,14 @@ namespace RHI
             if (desc->props.type == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
         }
         allocInfo.memoryTypeIndex = MemIndex;
-        *heap = vheap;
-        return vkAllocateMemory((VkDevice)ID, &allocInfo, nullptr, (VkDeviceMemory*)&vheap->ID);
+        VkResult res = vkAllocateMemory((VkDevice)ID, &allocInfo, nullptr, (VkDeviceMemory*)&vheap->ID);
+        if(res < 0)
+        {
+            delete vheap;
+            return creation_result<Ptr<Heap>>::err(marshall_error(res));
+        }
+
+        return creation_result<Ptr<Heap>>::ok(vheap);
     }
     VkShaderStageFlags VkShaderStage(ShaderStage stage)
     {
@@ -632,7 +693,7 @@ namespace RHI
         }
         return flags;
     }
-    RESULT Device::CreateRootSignature(RootSignatureDesc* desc, RootSignature** rootSignature, DescriptorSetLayout** pSetLayouts)
+    creation_result<Ptr<RootSignature>> Device::CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts)
     {
         vDescriptorSetLayout* vSetLayouts = new vDescriptorSetLayout[desc->numRootParameters];
         vRootSignature* vrootSignature = new vRootSignature;
@@ -641,6 +702,8 @@ namespace RHI
         
         VkPushConstantRange pushConstantRanges[20];
         
+        VkResult res;
+
         //uint32_t minSetIndex = UINT32_MAX;
         uint32_t numLayouts = 0;
         uint32_t pcIndex = 0;
@@ -659,7 +722,17 @@ namespace RHI
                 layoutInfo[numLayouts].bindingCount = 1;
                 layoutInfo[numLayouts].pBindings = &binding;
                 layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                if(res < 0)
+                {
+                    for(uint32_t j = 0; j < numLayouts; j++)
+                    {
+                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                    }
+                    delete[] vSetLayouts;
+                    delete vrootSignature;
+                    return creation_result<Ptr<RootSignature>>::err(marshall_error(res));
+                }
                 numLayouts++;
             }
             else if(desc->rootParameters[i].type == RootParameterType::PushConstant)
@@ -684,9 +757,19 @@ namespace RHI
                 layoutInfo[numLayouts].bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
                 layoutInfo[numLayouts].pBindings = LayoutBinding;
                 layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                if(res < 0)
+                {
+                    for(uint32_t j = 0; j < numLayouts; j++)
+                    {
+                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                    }
+                    delete[] vSetLayouts;
+                    delete vrootSignature;
+                    return creation_result<Ptr<RootSignature>>::err(marshall_error(res));
+                }
                 pSetLayouts[numLayouts] = &vSetLayouts[numLayouts];
-                vSetLayouts[numLayouts].device = this;
+                vSetLayouts[numLayouts].device = make_ptr(this);
                 numLayouts++;
             }
         }
@@ -706,9 +789,14 @@ namespace RHI
         pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
         pipelineLayoutInfo.pushConstantRangeCount = pcIndex;
         
-        VkResult res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
-        vrootSignature->device = this;
-        *rootSignature = vrootSignature;
+        res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
+        if(res < 0)
+        {
+            delete[] vSetLayouts;
+            delete vrootSignature;
+            return creation_result<Ptr<RootSignature>>::err(marshall_error(res));
+        }
+        vrootSignature->device = make_ptr(this);
         for (uint32_t i = 0; i < desc->numRootParameters; i++)
         {
             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
@@ -718,7 +806,7 @@ namespace RHI
             }
             vSetLayouts[i].ID = descriptorSetLayout[i];
         }
-        return res;
+        return creation_result<Ptr<RootSignature>>::ok(vrootSignature);
     }
     const VkCompareOp vkCompareFunc(RHI::ComparisonFunc func)
     {
@@ -782,7 +870,7 @@ namespace RHI
             break;
         }
     }
-    RESULT Device::CreatePipelineStateObject(PipelineStateObjectDesc* desc, PipelineStateObject** pPSO)
+    creation_result<Ptr<PipelineStateObject>> Device::CreatePipelineStateObject(PipelineStateObjectDesc* desc)
     {
         vPipelineStateObject* vPSO = new vPipelineStateObject;
         GFX_ASSERT(desc->numInputElements < 5);
@@ -972,14 +1060,17 @@ namespace RHI
         pipelineInfo.basePipelineIndex = -1; // Optional
         
 
-        vPSO->device = this;
-        Hold();
+        vPSO->device = make_ptr(this);
+        
         VkResult res = vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
-        if(res != VK_SUCCESS)DEBUG_BREAK;
-        *pPSO = vPSO;
+        if(res < 0)
+        {
+            delete vPSO;
+            return creation_result<Ptr<PipelineStateObject>>::err(marshall_error(res));
+        }
         for(int i = 0; i < index; i++)
             vkDestroyShaderModule((VkDevice)ID, modules[i], nullptr);
-        return RESULT();
+        return creation_result<Ptr<PipelineStateObject>>::ok(vPSO);
     }
     RESULT Device::CreateDescriptorSets(DescriptorHeap* heap, std::uint32_t numDescriptorSets, DescriptorSetLayout* layouts, DescriptorSet** pSets)
     {
@@ -1007,12 +1098,11 @@ namespace RHI
     {
         RHI::vTexture* vtex = new RHI::vTexture;
         vtex->ID = id;
-        vtex->Hold();
-        vtex->device = this;
-        Hold();
+        vtex->device = make_ptr(this);
+        
         return vtex;
     }
-    RESULT Device::UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* sets)
+    void Device::UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* sets)
     {
         
         VkWriteDescriptorSet writes[5]{};
@@ -1085,7 +1175,6 @@ namespace RHI
         }
         vkUpdateDescriptorSets((VkDevice)ID, numDescs, writes, 0, nullptr);
         
-        return RESULT();
     }
     VkImageType ImageType(TextureType type)
     {
@@ -1118,9 +1207,13 @@ namespace RHI
 
         return flags;
     }
-    RESULT Device::CreateDynamicDescriptor(DescriptorHeap* heap,DynamicDescriptor** descriptor, DescriptorType type,ShaderStage stage, RHI::Buffer* buffer,uint32_t offset,uint32_t size)
+    creation_result<Ptr<DynamicDescriptor>> Device::CreateDynamicDescriptor(DescriptorHeap* heap, DescriptorType type,ShaderStage stage, RHI::Buffer* buffer,uint32_t offset,uint32_t size)
     {
-        GFX_ASSERT(type == DescriptorType::ConstantBufferDynamic || type == DescriptorType::StructuredBufferDynamic);
+        if(type != DescriptorType::ConstantBufferDynamic || type != DescriptorType::StructuredBufferDynamic || heap == nullptr)
+        {
+            return creation_result<Ptr<DynamicDescriptor>>::err(CreationError::InvalidParameters);
+        }
+        VkResult res;
         VkDescriptorSetLayoutBinding binding;
         binding.binding = 0;
         binding.descriptorCount = 1;
@@ -1133,17 +1226,33 @@ namespace RHI
         info.bindingCount = 1;
         info.flags = 0;
         info.pBindings = &binding;
-        VkDescriptorSetLayout layout;
+        
         vDynamicDescriptor* vdescriptor = new vDynamicDescriptor();
-        vkCreateDescriptorSetLayout((VkDevice)ID, &info, nullptr, &layout);
+        res = vkCreateDescriptorSetLayout((VkDevice)ID, &info, nullptr, &vdescriptor->layout);
+        
+        if(res < 0)
+        {
+            delete vdescriptor;
+            return creation_result<Ptr<DynamicDescriptor>>::err(marshall_error(res));
+        }
+            
+
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = (VkDescriptorPool)heap->ID;
         allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &layout;
-        vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, (VkDescriptorSet*)&vdescriptor->ID);
-        *descriptor = vdescriptor;
-        //vkDestroyDescriptorSetLayout((VkDevice)ID, layout, nullptr);
+        allocInfo.pSetLayouts = &vdescriptor->layout;
+        res = vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, (VkDescriptorSet*)&vdescriptor->ID);
+        
+        if(res < 0)
+        {
+            delete vdescriptor;
+            return creation_result<Ptr<DynamicDescriptor>>::err(marshall_error(res));
+        }
+        
+        vdescriptor->device = make_ptr(this);
+        
+        vdescriptor->heap = (vDescriptorHeap*)heap;
         VkDescriptorBufferInfo binfo{};
         binfo.buffer = (VkBuffer)buffer->ID;
         binfo.offset = offset;
@@ -1155,9 +1264,9 @@ namespace RHI
         write.pBufferInfo = &binfo;
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         vkUpdateDescriptorSets((VkDevice)ID, 1,&write, 0, nullptr);
-        return RESULT();
+        return creation_result<Ptr<DynamicDescriptor>>::ok(vdescriptor);
     }
-    RESULT Device::CreateTexture(TextureDesc* desc, Texture** texture, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
+    creation_result<Ptr<Texture>> Device::CreateTexture(TextureDesc* desc, Texture** texture, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
     {
         vTexture* vtexture = new vTexture;
         VkImageCreateInfo info{};
@@ -1176,8 +1285,7 @@ namespace RHI
         info.tiling = ImageTiling(desc->mode);
         info.usage = ImageUsage(desc->usage);
         info.samples = VK_SAMPLE_COUNT_1_BIT;
-        vkCreateImage((VkDevice)ID, &info, nullptr, (VkImage*)&vtexture->ID);
-        vtexture->device = this;
+        vtexture->device = make_ptr(this);
         if (type == ResourceType::Automatic)
         {
             VmaAllocationCreateInfo allocCreateInfo{};
@@ -1187,29 +1295,54 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            RESULT res = vmaCreateImage(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkImage*)&vtexture->ID, &vtexture->vma_ID, nullptr);
-            *texture = vtexture;
-            return res;
+            VkResult res = vmaCreateImage(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkImage*)&vtexture->ID, &vtexture->vma_ID, nullptr);
+            if(res < 0)
+            {
+                delete vtexture;
+                return creation_result<Ptr<Texture>>::err(marshall_error(res));
+            }
+            return creation_result<Ptr<Texture>>::ok(vtexture);
+        }
+        VkResult res = vkCreateImage((VkDevice)ID, &info, nullptr, (VkImage*)&vtexture->ID);
+        if(res < 0)
+        {
+            delete vtexture;
+            return creation_result<Ptr<Texture>>::err(marshall_error(res));
         }
         if (type == ResourceType::Commited)
         {
-            RHI::Heap* iheap;
             RHI::HeapDesc hdesc;
             RHI::MemoryReqirements req;
             GetTextureMemoryRequirements(desc, &req);
             hdesc.props = *props;
             hdesc.size = req.size;
-            CreateHeap(&hdesc, &iheap, nullptr);
-            vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)iheap->ID, 0);
+            auto r = CreateHeap(&hdesc, nullptr);
+            if(r.is_err())
+            {
+                delete vtexture;
+                return r.transform([](Ptr<Heap>&)->Ptr<Texture>{return nullptr;});
+            }
+            vtexture->heap = r.value();
+            res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)vtexture->heap->ID, 0);
+            if(res < 0)
+            {
+                delete vtexture;
+                return creation_result<Ptr<Texture>>::err(marshall_error(res));
+            }
         }
         else if (type == ResourceType::Placed)
         {
-            vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)heap->ID, offset);
+            vtexture->heap = heap;
+            res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)heap->ID, offset);
+            if(res < 0)
+            {
+                delete vtexture;
+                return creation_result<Ptr<Texture>>::err(marshall_error(res));
+            }
         }
-        *texture = vtexture;
-        return RESULT();
+        return creation_result<Ptr<Texture>>::ok(vtexture);
     }
-    RESULT Device::GetTextureMemoryRequirements(TextureDesc* desc, MemoryReqirements* requirements)
+    void Device::GetTextureMemoryRequirements(TextureDesc* desc, MemoryReqirements* requirements)
     {
         VkImageCreateInfo info{};
         info.arrayLayers = desc->type == TextureType::Texture3D ? 1 : desc->depthOrArraySize;
@@ -1234,7 +1367,6 @@ namespace RHI
         requirements->alignment = req.memoryRequirements.alignment;
         requirements->size = req.memoryRequirements.size;
         requirements->memoryTypeBits = req.memoryRequirements.memoryTypeBits;
-        return RESULT();
     }
     static VkImageViewType VkViewType(TextureViewType type)
     {
@@ -1252,7 +1384,7 @@ namespace RHI
             break;
         }
     }
-    RESULT Device::CreateTextureView(TextureViewDesc* desc, TextureView** view)
+    creation_result<Ptr<TextureView>> Device::CreateTextureView(TextureViewDesc* desc)
     {
         VkImageViewCreateInfo info{};
         info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1272,9 +1404,13 @@ namespace RHI
         info.subresourceRange = range;
         info.viewType = VkViewType(desc->type);
         vTextureView* vtview = new vTextureView;
-        vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)&vtview->ID);
-        *view = vtview;
-        return RESULT();
+        VkResult res = vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)&vtview->ID);
+        if(res < 0)
+        {
+            delete vtview;
+            return creation_result<Ptr<TextureView>>::err(marshall_error(res));
+        }
+        return creation_result<Ptr<TextureView>>::ok(vtview);
     }
     VkSamplerAddressMode VkAddressMode(AddressMode mode)
     {
@@ -1300,7 +1436,7 @@ namespace RHI
     {
         return (mode == Filter::Linear) ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
     }
-    RESULT Device::CreateSampler(SamplerDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateSampler(SamplerDesc* desc, CPU_HANDLE heapHandle)
     {
         VkSamplerCreateInfo info;
         info.addressModeU = VkAddressMode(desc->AddressU);
@@ -1321,33 +1457,40 @@ namespace RHI
         info.pNext = 0;
         info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         info.unnormalizedCoordinates = VK_FALSE;
-        vkCreateSampler((VkDevice)ID, &info, nullptr, (VkSampler*)heapHandle.ptr);
-        return RESULT();
+        return marshall_error(vkCreateSampler((VkDevice)ID, &info, nullptr, (VkSampler*)heapHandle.ptr));
     }
-    RESULT Device::CreateComputePipeline(ComputePipelineDesc* desc, ComputePipeline** pCP)
+    creation_result<Ptr<ComputePipeline>> Device::CreateComputePipeline(ComputePipelineDesc* desc)
     {
         vComputePipeline* vpipeline = new vComputePipeline;
-        vpipeline->device = this;
+        vpipeline->device = make_ptr(this);
         VkComputePipelineCreateInfo info{};
         info.layout = (VkPipelineLayout)desc->rootSig->ID;
         VkShaderModule module;
         if (desc->mode == ShaderMode::File) CreateShaderModule(desc->CS.data, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         else CreateShaderModule(desc->CS.data, desc->CS.size, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        vkCreateComputePipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &info, nullptr, (VkPipeline*)&vpipeline->ID);
-        *pCP = vpipeline;
+        VkResult res = vkCreateComputePipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &info, nullptr, (VkPipeline*)&vpipeline->ID);
+        
+        if(res < 0)
+        {
+            delete vpipeline;
+            return creation_result<Ptr<ComputePipeline>>::err(marshall_error(res));
+        }
         vkDestroyShaderModule((VkDevice)ID, module, nullptr);
-        Hold();
-        return RESULT();
+        return creation_result<Ptr<ComputePipeline>>::ok(vpipeline);
     }
-    RESULT Device::CreateDebugBuffer(DebugBuffer** buffer)
+    creation_result<Ptr<DebugBuffer>> Device::CreateDebugBuffer()
     {
         vDebugBuffer* buff = new vDebugBuffer;
         VkAfterCrash_BufferCreateInfo info;
         info.markerCount = 1;
-        VkAfterCrash_CreateBuffer(((vDevice*)this)->acDevice, &info, (VkAfterCrash_Buffer*)&buff->ID,&buff->data);
-        *buffer = buff;
-        return 0;
+        VkResult res = VkAfterCrash_CreateBuffer(((vDevice*)this)->acDevice, &info, (VkAfterCrash_Buffer*)&buff->ID,&buff->data);
+        if(res < 0)
+        {
+            delete buff;
+            return creation_result<Ptr<DebugBuffer>>::err(marshall_error(res));
+        }
+        return creation_result<Ptr<DebugBuffer>>::ok(buff);
     }
 
 }

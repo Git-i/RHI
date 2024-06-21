@@ -1,0 +1,3 @@
+[submodule "subprojects/ezr"]
+	path = subprojects/ezr
+	url = git@github.com:Git-i/ezr.git

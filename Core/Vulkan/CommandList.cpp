@@ -35,7 +35,7 @@ namespace RHI
         Info.commandBufferCount = 1;
         //vkFreeCommandBuffers((VkDevice)Device_ID, (VkCommandPool)(((vGraphicsCommandList*)this)->m_allocator), 1, (VkCommandBuffer*)&ID);
         //vkResetCommandBuffer((VkCommandBuffer)ID, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-        vkAllocateCommandBuffers((VkDevice)((vDevice*)device)->ID, &Info, (VkCommandBuffer*)&ID);
+        vkAllocateCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, &Info, (VkCommandBuffer*)&ID);
         if(name) SetName(name);
         ((vGraphicsCommandList*)this)->allocator = (vCommandAllocator*)allocator;
         ((vCommandAllocator*)allocator)->m_pools.push_back(ID);
@@ -66,8 +66,8 @@ namespace RHI
             BufferBarr[i].buffer = (VkBuffer)bufferBarrier[i].buffer->ID;
             BufferBarr[i].srcAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsBefore;
             BufferBarr[i].dstAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsAfter;
-            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd((vDevice*)device, bufferBarrier[i].previousQueue);
-            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd((vDevice*)device, bufferBarrier[i].nextQueue);
+            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), bufferBarrier[i].previousQueue);
+            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), bufferBarrier[i].nextQueue);
             if (BufferBarr[i].srcQueueFamilyIndex == BufferBarr[i].dstQueueFamilyIndex)
                 BufferBarr[i].srcQueueFamilyIndex = BufferBarr[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             BufferBarr[i].offset = bufferBarrier[i].offset;
@@ -82,8 +82,8 @@ namespace RHI
             ImageBarr[i].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
             ImageBarr[i].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
             ImageBarr[i].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pImageBarriers[i].previousQueue);
-            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pImageBarriers[i].nextQueue);
+            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue);
+            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue);
             VkImageSubresourceRange range;
             range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
             range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
@@ -160,7 +160,7 @@ namespace RHI
     }
     RESULT GraphicsCommandList::PushConstant(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
     {
-        vRootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        vRootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
         vkCmdPushConstants((VkCommandBuffer)ID,(VkPipelineLayout)rs->ID,rs->pcBindingToStage[bindingIndex], offsetIn32BitSteps * sizeof(uint32_t), numConstants * sizeof(uint32_t), constants);
         return RESULT();
     }
@@ -225,7 +225,7 @@ namespace RHI
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets,1,&offset);
         return 0;
     }
@@ -233,7 +233,7 @@ namespace RHI
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
         return RESULT();
     }
@@ -340,13 +340,13 @@ namespace RHI
         int bn = 0, tn = 0;
         for (uint32_t i = 0; i < numBufferBarriers; i++)
         {
-            if (QueueFamilyInd((vDevice*)device, pbufferBarriers[i].previousQueue) == QueueFamilyInd((vDevice*)device, pbufferBarriers[i].nextQueue))
+            if (QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].nextQueue))
                 continue;
             BufferBarr[bn].buffer = (VkBuffer)pbufferBarriers[i].buffer->ID;
             BufferBarr[bn].srcAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsBefore;
             BufferBarr[bn].dstAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsAfter;
-            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pbufferBarriers[i].previousQueue);
-            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pbufferBarriers[i].nextQueue);
+            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].previousQueue);
+            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].nextQueue);
             BufferBarr[bn].offset = pbufferBarriers[i].offset;
             BufferBarr[bn].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
             BufferBarr[bn].size = pbufferBarriers[i].size;
@@ -354,7 +354,7 @@ namespace RHI
         }
         for (uint32_t i = 0; i < numImageBarriers; i++)
         {
-            if(QueueFamilyInd((vDevice*)device, pImageBarriers[i].previousQueue) == QueueFamilyInd((vDevice*)device, pImageBarriers[i].nextQueue))
+            if(QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue))
                 continue;
             ImageBarr[tn].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             ImageBarr[tn].image = (VkImage)pImageBarriers[i].texture->ID;
@@ -362,8 +362,8 @@ namespace RHI
             ImageBarr[tn].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
             ImageBarr[tn].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
             ImageBarr[tn].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pImageBarriers[i].previousQueue);
-            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd((vDevice*)device, pImageBarriers[i].nextQueue);
+            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue);
+            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue);
             VkImageSubresourceRange range;
             range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
             range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
@@ -387,7 +387,7 @@ namespace RHI
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
         return RESULT();
     }
@@ -395,7 +395,7 @@ namespace RHI
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS;
+        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 1, &offset);
         return 0;
     }

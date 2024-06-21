@@ -24,6 +24,7 @@ typedef unsigned int RESULT;
 #include <cstring>
 #include <limits.h>
 #include <float.h>
+#include "result.hpp"
 
 #ifndef DEINFE_ENUM_FLAG_OPERATORS
 template <size_t S> struct _ENUM_FLAG_INTEGER_FOR_SIZE;

@@ -32,9 +32,11 @@ namespace RHI
     class vDevice : public Device
     {
     public:
-        virtual void Destroy() override
+        virtual ~vDevice() override
         {
             delete Object::refCnt;
+            vmaDestroyAllocator(allocator);
+            VkAfterCrash_DestroyDevice(acDevice);
             vkDestroyDevice((VkDevice)ID, nullptr);
         }
         virtual int32_t GetType() override
@@ -58,19 +60,20 @@ namespace RHI
     public:
         std::uint64_t offset;
         std::uint64_t size;
-        Internal_ID heap;
+        Ptr<Heap> heap;
         VmaAllocation vma_ID = 0;//for automatic resources
     };
     class vBuffer : public Buffer, public vResource
     {
     public:
-        virtual void Destroy() override
+        virtual ~vBuffer() override
         {
             delete Object::refCnt;
-            if(vma_ID) vmaDestroyBuffer(((vDevice*)device)->allocator, (VkBuffer)ID, vma_ID);
-            else vkDestroyBuffer( (VkDevice) ((vDevice*)device)->ID, (VkBuffer)ID, nullptr);
+            if(vma_ID) vmaDestroyBuffer(device.retrieve_as<vDevice>()->allocator, (VkBuffer)ID, vma_ID);
+            else vkDestroyBuffer( (VkDevice)(device.retrieve_as<vDevice>())->ID, (VkBuffer)ID, nullptr);
             vma_ID = nullptr; ID = nullptr;
-            ((vDevice*)device)->Release();
+            if(heap.Get()) heap->Release();
+            (device.retrieve_as<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -78,18 +81,18 @@ namespace RHI
         }
     };
     
-    class vCommandAllocator : public CommandAllocator
+    class vCommandAllocator final: public CommandAllocator
     {
     public:
-        virtual void Destroy() override
+        ~vCommandAllocator() override
         {
             delete Object::refCnt;
             if (((vCommandAllocator*)this)->m_pools.size())
             {
-                vkFreeCommandBuffers((VkDevice)((vDevice*)device)->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
+                vkFreeCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
             }
-            vkDestroyCommandPool((VkDevice)((vDevice*)device)->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyCommandPool((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
+            (device.retrieve_as<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -120,32 +123,37 @@ namespace RHI
         }
     };
     
-    class vDynamicDescriptor : public DynamicDescriptor
-    {
-
-    };
     class vDescriptorHeap : public DescriptorHeap
     {
     public:
-        virtual void Destroy() override
+        virtual ~vDescriptorHeap() override
         {
             delete Object::refCnt;
-            vkDestroyDescriptorPool((VkDevice)((vDevice*)device)->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyDescriptorPool((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
+            (device.retrieve_as<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DESCRIPTOR_POOL;
         }
     };
+    class vDynamicDescriptor final: public DynamicDescriptor
+    {
+    public:
+    ~vDynamicDescriptor() override
+    {
+        if(layout) vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, layout, nullptr);
+    };
+    VkDescriptorSetLayout layout = nullptr;
+    Ptr<vDescriptorHeap> heap = nullptr;
+    };
     class vFence : public Fence
     {
     public:
-        virtual void Destroy() override
+        virtual ~vFence() override
         {
             delete Object::refCnt;
-            vkDestroySemaphore((VkDevice)((vDevice*)device)->ID, (VkSemaphore)Fence::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroySemaphore((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSemaphore)Fence::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -155,11 +163,10 @@ namespace RHI
     class vHeap : public Heap
     {
     public:
-        virtual void Destroy() override
+        virtual ~vHeap() override
         {
             delete Object::refCnt;
-            vkFreeMemory((VkDevice)((vDevice*)device)->ID, (VkDeviceMemory)Heap::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkFreeMemory((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDeviceMemory)Heap::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -169,11 +176,10 @@ namespace RHI
     class vDescriptorSetLayout : public DescriptorSetLayout
     {
     public:
-        virtual void Destroy() override
+        virtual ~vDescriptorSetLayout() override
         {
             delete Object::refCnt;
-            vkDestroyDescriptorSetLayout((VkDevice)((vDevice*)device)->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -183,11 +189,11 @@ namespace RHI
     class vRootSignature : public RootSignature
     {
     public:
-        virtual void Destroy() override
+        virtual ~vRootSignature() override
         {
             delete Object::refCnt;
-            vkDestroyPipelineLayout((VkDevice)((vDevice*)device)->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyPipelineLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
+
         }
         virtual int32_t GetType() override
         {
@@ -198,30 +204,29 @@ namespace RHI
     class vGraphicsCommandList : public GraphicsCommandList
     {
     public:
-        void Destroy() override
+        ~vGraphicsCommandList() override
         {
             if (auto pos = std::find(allocator->m_pools.begin(), allocator->m_pools.end(), ID); pos != allocator->m_pools.end())
             {
                 allocator->m_pools.erase(pos);
             }
-            vkFreeCommandBuffers((VkDevice)((vDevice*)device)->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
-            ((vDevice*)device)->Release();
+            vkFreeCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
+            (device.retrieve_as<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
             return VK_OBJECT_TYPE_COMMAND_BUFFER;
         }
-        vCommandAllocator* allocator;
-        vRootSignature* currentRS = nullptr;
+        Ptr<vCommandAllocator> allocator;
+        Ptr<vRootSignature> currentRS = nullptr;
     };
     class vPipelineStateObject : public PipelineStateObject
     {
     public:
-        virtual void Destroy() override
+        virtual ~vPipelineStateObject() override
         {
             delete Object::refCnt;
-            vkDestroyPipeline((VkDevice)((vDevice*)device)->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyPipeline((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -231,11 +236,10 @@ namespace RHI
     class vComputePipeline : public ComputePipeline
     {
     public:
-        virtual void Destroy() override
+        virtual ~vComputePipeline() override
         {
             delete Object::refCnt;
-            vkDestroyPipeline((VkDevice)((vDevice*)device)->ID, (VkPipeline)ComputePipeline::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroyPipeline((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipeline)ComputePipeline::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -248,12 +252,11 @@ namespace RHI
     class vTexture : public Texture, public vResource
     {
     public:
-        virtual void Destroy() override
+        virtual ~vTexture() override
         {
             delete Object::refCnt;
-            if(vma_ID) vmaDestroyImage(((vDevice*)device)->allocator, (VkImage)ID, vma_ID);
-            else vkDestroyImage((VkDevice)((vDevice*)device)->ID, (VkImage)Texture::ID, nullptr);
-            ((vDevice*)device)->Release();
+            if(vma_ID) vmaDestroyImage((device.retrieve_as<vDevice>())->allocator, (VkImage)ID, vma_ID);
+            else vkDestroyImage((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkImage)Texture::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -264,11 +267,10 @@ namespace RHI
     {
     public:
         VkDebugUtilsMessengerEXT messanger;
-        virtual void Destroy() override
+        virtual ~vInstance() override
         {
             delete Object::refCnt;
             vkDestroyInstance((VkInstance)Instance::ID, nullptr);
-            ((vDevice*)device)->Release();
         }
         virtual int32_t GetType() override
         {
@@ -281,11 +283,10 @@ namespace RHI
     class vSwapChain : public SwapChain
     {
     public:
-        virtual void Destroy() override
+        virtual ~vSwapChain() override
         {
             delete Object::refCnt;
-            vkDestroySwapchainKHR((VkDevice)((vDevice*)device)->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
-            ((vDevice*)device)->Release();
+            vkDestroySwapchainKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -298,7 +299,7 @@ namespace RHI
     class vShaderReflection : public ShaderReflection
     {
     public:
-        virtual void Destroy() override
+        virtual ~vShaderReflection() override
         {
             delete Object::refCnt;
             delete ((SpvReflectShaderModule*)Object::ID);

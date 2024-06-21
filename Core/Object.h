@@ -2,6 +2,7 @@
 #include "Core.h"
 #include <atomic>
 #include <cstdint>
+#include "Ptr.h"
 namespace RHI
 {
 	class RHI_API Object
@@ -17,7 +18,7 @@ namespace RHI
 		int GetRefCount();
 		char* name = nullptr;
 		Internal_ID ID = nullptr;
-		virtual void Destroy() {};
-		void* device = nullptr;
+		virtual ~Object(){}
+		Ptr<Object> device = nullptr;
 	};
 }
