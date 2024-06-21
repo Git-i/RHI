@@ -24,6 +24,18 @@ namespace RHI
         default: return VK_FORMAT_UNDEFINED;
         }
     }
+    CreationError marshall_error(VkResult r)
+    {
+        switch(r)
+        {
+            case(VK_ERROR_OUT_OF_DEVICE_MEMORY): return CreationError::OutOfDeviceMemory;
+            case(VK_ERROR_OUT_OF_HOST_MEMORY): return CreationError::OutOfHostMemory;
+            case(VK_SUCCESS): return CreationError::None;
+            case(VK_ERROR_FRAGMENTED_POOL): return CreationError::FragmentedHeap;
+            case(VK_ERROR_OUT_OF_POOL_MEMORY): return CreationError::OutOfHeapMemory;
+            default: return CreationError::Unknown;
+        }
+    }
     VkPrimitiveTopology vkPrimitiveTopology(PrimitiveTopology topology)
     {
         switch (topology)

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.h"
+#include "Ptr.h"
 
 namespace RHI
 {
@@ -363,6 +364,19 @@ namespace RHI
 	{
 		AutomaticAllocationCPUAccessMode access_mode;
 	};
+
+	enum class CreationError
+	{
+		Unknown = -1,
+		None = 0,
+		OutOfHostMemory = 1,
+		OutOfDeviceMemory = 2,
+		InvalidParameters = 3,
+		FragmentedHeap = 4,
+		OutOfHeapMemory = 5
+	};
+	template<typename T>
+	using creation_result = ezr::result<Ptr<T>, CreationError>;
 	//Structs for tag dispatch
 	typedef union { void* ptr; std::uintptr_t val; } CPU_HANDLE;
 	typedef struct {} Default_t;

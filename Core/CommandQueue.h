@@ -2,7 +2,6 @@
 #include "Core.h"
 #include "Object.h"
 #include "FormatsAndTypes.h"
-#include "SwapChain.h"
 #include "Fence.h"
 namespace RHI
 {

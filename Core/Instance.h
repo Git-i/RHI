@@ -1,5 +1,6 @@
 #pragma once
 #include "Core.h"
+#include "FormatsAndTypes.h"
 #include "PhysicalDevice.h"
 #include "SwapChain.h"
 #include "Device.h"
@@ -16,7 +17,7 @@ namespace RHI
 		RESULT GetAllPhysicalDevices(PhysicalDevice** devices);
 		RESULT GetPhysicalDevice(int id, PhysicalDevice** device);
 		static RHI::Instance* FromNativeHandle(Internal_ID id);
-		RESULT CreateSwapChain(SwapChainDesc* desc, PhysicalDevice* device, Device* pDevice, CommandQueue* pCommandQueue, SwapChain** pSwapChain);
+		creation_result<SwapChain> CreateSwapChain(SwapChainDesc* desc, PhysicalDevice* device, Device* pDevice, CommandQueue* pCommandQueue);
 	};
 
 }
