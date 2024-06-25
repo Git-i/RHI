@@ -4,7 +4,7 @@
 #include "VulkanSpecific.h"
 namespace RHI
 {
-    static VkAttachmentLoadOp VulkanLoadOp(LoadOp op)
+    static VkAttachmentLoadOp vloadOp(LoadOp op)
     {
         switch (op)
         {
@@ -14,7 +14,7 @@ namespace RHI
         default: return VK_ATTACHMENT_LOAD_OP_MAX_ENUM;
         }
     }
-    static VkAttachmentStoreOp VulkanStoreOp(StoreOp op)
+    static VkAttachmentStoreOp vStoreOp(StoreOp op)
     {
         switch (op)
         {
@@ -97,36 +97,10 @@ namespace RHI
         vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, numBufferBarriers, BufferBarr, numImageBarriers, ImageBarr);
         return RESULT();
     }
-    VkAttachmentLoadOp vloadOp(LoadOp op)
-    {
-        switch (op)
-        {
-        case RHI::LoadOp::Load: return VK_ATTACHMENT_LOAD_OP_LOAD;
-            break;
-        case RHI::LoadOp::Clear: return VK_ATTACHMENT_LOAD_OP_CLEAR;
-            break;
-        case RHI::LoadOp::DontCare: return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            break;
-        default:
-            break;
-        }
-    }
-    VkAttachmentStoreOp vStoreOp(StoreOp op)
-    {
-        switch (op)
-        {
-        case RHI::StoreOp::Store: return VK_ATTACHMENT_STORE_OP_STORE;
-            break;
-        case RHI::StoreOp::DontCare: return VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            break;
-        default:
-            break;
-        }
-    }
     RESULT GraphicsCommandList::BeginRendering(const RenderingBeginDesc* desc)
     {
         VkRenderingAttachmentInfo Attachmentinfos[5] = {};
-        for (int i = 0; i < desc->numColorAttachments; i++)
+        for (uint32_t i = 0; i < desc->numColorAttachments; i++)
         {
             Attachmentinfos[i].clearValue.color = *(VkClearColorValue*)&desc->pColorAttachments[i].clearColor;
             Attachmentinfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -181,7 +155,7 @@ namespace RHI
     RESULT GraphicsCommandList::SetScissorRects(uint32_t numRects, Area2D* rects)
     {
         VkRect2D scr[4];
-        for (int i = 0; i < numRects; i++)
+        for (uint32_t i = 0; i < numRects; i++)
         {
             scr[i].extent = { rects[i].size.x, rects[i].size.y};
             scr[i].offset = { rects[i].offset.x,rects[i].offset.y};
@@ -192,7 +166,7 @@ namespace RHI
     RESULT GraphicsCommandList::SetViewports(uint32_t numViewports, Viewport* viewports)
     {
         VkViewport vp[4];
-        for (int i = 0; i < numViewports; i++)
+        for (uint32_t i = 0; i < numViewports; i++)
         {
             vp[i].x = viewports[i].x;
             vp[i].height = -viewports[i].height + viewports[i].y;
