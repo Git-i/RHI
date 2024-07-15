@@ -1,7 +1,7 @@
 #pragma once
 #include "Object.h"
-#include "Texture.h"
 #include "FormatsAndTypes.h"
+#include "Texture.h"
 namespace RHI
 {
 	enum class TextureViewType
@@ -11,14 +11,16 @@ namespace RHI
 	struct TextureViewDesc
 	{
 		TextureViewType type;
-		RHI::Format format;
+		Format format;
 		//TODO 4 component mapping
-		RHI::Texture* texture;
-		RHI::SubResourceRange range;
+		Weak<Texture> texture;
+		SubResourceRange range;
 	};
 	class TextureView : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(TextureView);
+	public:
+	   Ptr<Texture> GetTexture();
 	};
 }

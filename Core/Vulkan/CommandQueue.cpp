@@ -4,7 +4,7 @@
 #include "volk.h"
 namespace RHI
 {
-	RESULT CommandQueue::SignalFence(Fence* fence, std::uint64_t val)
+	RESULT CommandQueue::SignalFence(Weak<Fence> fence, std::uint64_t val)
 	{
 		std::uint64_t fenceVal = val;
 		VkTimelineSemaphoreSubmitInfo timelineInfo = {};
@@ -28,7 +28,7 @@ namespace RHI
 		submitInfo.pCommandBuffers = (VkCommandBuffer*)lists;
 		return vkQueueSubmit((VkQueue)ID, 1, &submitInfo, VK_NULL_HANDLE);
 	}
-	RESULT CommandQueue::WaitForFence(Fence* fence, std::uint64_t val)
+	RESULT CommandQueue::WaitForFence(Weak<Fence> fence, std::uint64_t val)
 	{
 		std::uint64_t value = val;
 		VkTimelineSemaphoreSubmitInfo timelineInfo{};

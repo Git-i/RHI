@@ -1,9 +1,12 @@
 #include "CommandAllocator.h"
 #include "CommandList.h"
+#include "CommandQueue.h"
 #include "DebugBuffer.h"
 #include "DescriptorHeap.h"
 #include "FormatsAndTypes.h"
+#include "Heap.h"
 #include "PipelineStateObject.h"
+#include "Ptr.h"
 #include "RootSignature.h"
 #include "Texture.h"
 #include "TextureView.h"
@@ -13,6 +16,8 @@
 #include "VulkanSpecific.h"
 #include "result.hpp"
 #include "volk.h"
+#include <memory>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #define VULKAN_AFTER_CRASH_IMPLEMENTATION
@@ -23,7 +28,7 @@
 #include <fstream>
 
 using namespace ezr;
-static void SelectHeapIndices(RHI::vDevice* device)
+static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 {
     std::uint32_t DefaultHeap = UINT32_MAX;
     std::uint32_t UploadHeap = UINT32_MAX;
@@ -42,15 +47,17 @@ static void SelectHeapIndices(RHI::vDevice* device)
     device->ReadbackHeapIndex = ReadbackHeap;
 }
 
-extern "C"
+namespace RHI
 {
-    RESULT RHI_API RHICreateDevice(RHI::PhysicalDevice* PhysicalDevice, RHI::CommandQueueDesc* commandQueueInfos, int numCommandQueues, RHI::CommandQueue** commandQueues, Internal_ID instance, RHI::Device** device,bool* MQ, RHI::DeviceCreateFlags flags)
+    ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
+    Device::Create(PhysicalDevice* PhysicalDevice,CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance,bool* MQ, DeviceCreateFlags flags)
     {
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         if(MQ)*MQ = true;
         VkPhysicalDeviceMemoryProperties memProps;
-        RHI::vDevice* vdevice = new RHI::vDevice;
-        RHI::vCommandQueue* vqueue = new RHI::vCommandQueue[numCommandQueues];
+        Ptr<vDevice> vdevice = new RHI::vDevice;
+        std::unique_ptr<vCommandQueue[]> vqueue = std::make_unique<vCommandQueue[]>(numCommandQueues);
+        std::vector<Ptr<CommandQueue>> queues;
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
         for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
@@ -142,17 +149,21 @@ extern "C"
         info.enabledExtensionCount = ARRAYSIZE(ext_name);
         info.ppEnabledExtensionNames = ext_name;
         VkResult res = vkCreateDevice(vkPhysicalDevice, &info, nullptr, (VkDevice*)&vdevice->ID);
-        
-       
+        if(res < 0)
+        {
+            return ezr::err(marshall_error(res));
+        }
+        vCommandQueue* queue_mem = vqueue.release();
         for (int i = 0; i < numCommandQueues; i++)
         {
+
             uint32_t index = 0;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
-            vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&vqueue[i].ID);
-            vqueue[i].device = vdevice;
-            commandQueues[i] = &vqueue[i];
+            vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&queue_mem[i].ID);
+            queue_mem[i].device = vdevice;
+            queues.emplace_back((CommandQueue*)queue_mem);
         }
         //initialize VMA
         VkExternalMemoryHandleTypeFlagsKHR ext_mem[] = {
@@ -169,25 +180,21 @@ extern "C"
         vmaInfo.physicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         vmaInfo.pVulkanFunctions = nullptr;
         vmaInfo.pTypeExternalMemoryHandleTypes = (flags & RHI::DeviceCreateFlags::ShareAutomaticMemory) != RHI::DeviceCreateFlags::None ? ext_mem:0;//
-        
-        vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
+
+        res = vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
+        if(res < 0) return ezr::err(marshall_error(res));
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
         acInfo.vkDevice = (VkDevice)vdevice->ID;
         acInfo.vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
-        *device = vdevice;
-        return res;
+        return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), queues});
     }
-}
-namespace RHI
-{   
-    
     RHI::Device* Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
     {
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)phys_device;
         VkPhysicalDeviceMemoryProperties memProps;
-        RHI::vDevice* vdevice = new RHI::vDevice;
+        vDevice* vdevice = new RHI::vDevice;
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
         for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
@@ -202,7 +209,7 @@ namespace RHI
             prop.pageProperty = CPUprop;
             vdevice->HeapProps.emplace_back(prop);
         }
-        SelectHeapIndices(vdevice);
+        SelectHeapIndices(Weak<vDevice>{vdevice});
         vdevice->indices = indices;
         vdevice->ID = id;
         VmaAllocatorCreateInfo vmaInfo{};
@@ -212,7 +219,7 @@ namespace RHI
         vmaInfo.physicalDevice = vkPhysicalDevice;
         vmaInfo.pVulkanFunctions = nullptr;
         vmaInfo.pTypeExternalMemoryHandleTypes = 0;
-        
+
         vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
@@ -246,7 +253,7 @@ namespace RHI
         vertShaderStageInfo.stage = stage;
         vertShaderStageInfo.module = module[index];
         vertShaderStageInfo.pName = "main";
-        
+
         return VK_SUCCESS;
     }
     static VkResult CreateShaderModule(const char* memory, uint32_t size, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage, int index, VkShaderModule* module, Internal_ID device)
@@ -281,7 +288,7 @@ namespace RHI
     {
         return 0;
     }
-    
+
     RESULT Device::ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle)
     {
         vTexture* vtex = (vTexture*)texture;
@@ -336,7 +343,7 @@ namespace RHI
     }
     creation_result<CommandAllocator> Device::CreateCommandAllocator(CommandListType type)
     {
-        vCommandAllocator* vallocator = new vCommandAllocator;
+        std::unique_ptr<vCommandAllocator> vallocator = std::make_unique<vCommandAllocator>();
         std::uint32_t index = 0;
         if (type == CommandListType::Direct) index = ((vDevice*)this)->indices.graphicsIndex;
         if (type == CommandListType::Compute) index = ((vDevice*)this)->indices.computeIndex;
@@ -348,18 +355,14 @@ namespace RHI
         info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; //to align with d3d's model
         VkResult res = vkCreateCommandPool((VkDevice)ID, &info, nullptr, (VkCommandPool*)&vallocator->ID);
         vallocator->device = make_ptr(this);
-        
-        
-        if(res < 0)
-        {
-            delete vallocator;
-            return creation_result<CommandAllocator>::err(marshall_error(res));
-        }
-        return creation_result<CommandAllocator>::ok(vallocator);
+
+
+        if(res < 0) return creation_result<CommandAllocator>::err(marshall_error(res));
+        return creation_result<CommandAllocator>::ok(vallocator.release());
     }
     creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, CommandAllocator* allocator)
     {
-        vGraphicsCommandList* vCommandlist = new vGraphicsCommandList;
+        std::unique_ptr<vGraphicsCommandList> vCommandlist = std::make_unique<vGraphicsCommandList>();
         VkCommandBufferAllocateInfo Info = {};
         Info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         Info.commandPool = (VkCommandPool)allocator->ID;
@@ -369,15 +372,15 @@ namespace RHI
         VkResult res = vkAllocateCommandBuffers((VkDevice)ID, &Info, &commandBuffer);
         vCommandlist->ID = commandBuffer;
         vCommandlist->device = make_ptr(this);
-        vCommandlist->allocator = ((vCommandAllocator*)allocator);
-        
+        vCommandlist->allocator = make_ptr((vCommandAllocator*)allocator);
+
         if(res < 0)
         {
             return creation_result<GraphicsCommandList>::err(marshall_error(res));
         }
-        
+
         ((vCommandAllocator*)allocator)->m_pools.push_back(vCommandlist->ID);
-        
+
         return creation_result<GraphicsCommandList>::ok(vCommandlist);
     }
     VkDescriptorType DescType(RHI::DescriptorType type)
@@ -404,43 +407,39 @@ namespace RHI
             break;
         }
     }
-    creation_result<DescriptorHeap> Device::CreateDescriptorHeap(DescriptorHeapDesc* desc)
+    creation_result<DescriptorHeap> Device::CreateDescriptorHeap(const DescriptorHeapDesc& desc)
     {
-        vDescriptorHeap* vdescriptorHeap = new vDescriptorHeap;
+        std::unique_ptr<vDescriptorHeap> vdescriptorHeap = std::make_unique<vDescriptorHeap>();
         VkResult res = VK_SUCCESS;
-        if (desc->poolSizes->type == DescriptorType::RTV || desc->poolSizes->type == DescriptorType::DSV)
+        if (desc.poolSizes->type == DescriptorType::RTV || desc.poolSizes->type == DescriptorType::DSV)
         {
-            vdescriptorHeap->ID = new VkImageView[desc->poolSizes->numDescriptors];
+            vdescriptorHeap->ID = new VkImageView[desc.poolSizes->numDescriptors];
         }
-        else if (desc->poolSizes->type == DescriptorType::Sampler)
+        else if (desc.poolSizes->type == DescriptorType::Sampler)
         {
-            vdescriptorHeap->ID = new VkSampler[desc->poolSizes->numDescriptors];
+            vdescriptorHeap->ID = new VkSampler[desc.poolSizes->numDescriptors];
         }
         else
         {
             VkDescriptorPoolSize poolSize[5]{};
-            for (uint32_t i = 0; i < desc->numPoolSizes; i++)
+            for (uint32_t i = 0; i < desc.numPoolSizes; i++)
             {
-                poolSize[i].type = DescType(desc->poolSizes[i].type);
-                poolSize[i].descriptorCount = desc->poolSizes[i].numDescriptors;
+                poolSize[i].type = DescType(desc.poolSizes[i].type);
+                poolSize[i].descriptorCount = desc.poolSizes[i].numDescriptors;
             }
 
             VkDescriptorPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-            poolInfo.poolSizeCount = desc->numPoolSizes;
+            poolInfo.poolSizeCount = desc.numPoolSizes;
             poolInfo.pPoolSizes = poolSize;
-            poolInfo.maxSets = desc->maxDescriptorSets;
+            poolInfo.maxSets = desc.maxDescriptorSets;
 
             res = vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
         }
-        if(res < 0)
-        {
-            delete vdescriptorHeap;
-            return creation_result<DescriptorHeap>::err(marshall_error(res));
-        }
-        return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
+        if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
+        return creation_result<DescriptorHeap>::ok(vdescriptorHeap.release());
     }
-    CreationError Device::CreateRenderTargetView(Texture* texture, RenderTargetViewDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateRenderTargetView(Weak<Texture> texture, const RenderTargetViewDesc& desc, CPU_HANDLE heapHandle)
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -452,15 +451,15 @@ namespace RHI
         info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        info.subresourceRange.baseMipLevel = desc->textureMipSlice;
+        info.subresourceRange.baseMipLevel = desc.textureMipSlice;
         info.subresourceRange.levelCount = 1;
-        info.subresourceRange.baseArrayLayer = desc->TextureArray ? desc->arraySlice: 0;
+        info.subresourceRange.baseArrayLayer = desc.TextureArray ? desc.arraySlice: 0;
         info.subresourceRange.layerCount = 1;
-        info.format = FormatConv(desc->format);
+        info.format = FormatConv(desc.format);
        return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
-        
+
     }
-    CreationError Device::CreateDepthStencilView(Texture* texture, DepthStencilViewDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateDepthStencilView(Weak<Texture> texture, const DepthStencilViewDesc& desc, CPU_HANDLE heapHandle)
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -472,11 +471,11 @@ namespace RHI
         info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        info.subresourceRange.baseMipLevel = desc->textureMipSlice;
+        info.subresourceRange.baseMipLevel = desc.textureMipSlice;
         info.subresourceRange.levelCount = 1;
-        info.subresourceRange.baseArrayLayer = desc->TextureArray?desc->arraySlice:0;
+        info.subresourceRange.baseArrayLayer = desc.TextureArray ? desc.arraySlice:0;
         info.subresourceRange.layerCount = 1;
-        info.format = FormatConv(desc->format);
+        info.format = FormatConv(desc.format);
         return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
     }
     std::uint32_t Device::GetDescriptorHeapIncrementSize(DescriptorType type)
@@ -489,24 +488,19 @@ namespace RHI
     }
     creation_result<Texture> Device::GetSwapChainImage(SwapChain* swapchain, std::uint32_t index)
     {
-        vTexture* vtexture = new vTexture;
+        std::unique_ptr<vTexture> vtexture = std::make_unique<vTexture>();
         std::uint32_t img = index + 1;
         std::vector<VkImage> images(img);
         VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
         (vtexture)->ID = images[index];
         vtexture->Hold();//the image is externally owned
         vtexture->device = make_ptr(this);
-        if(res < 0)
-        {
-            vtexture->ID = nullptr;
-            delete vtexture;
-            return creation_result<Texture>::err(marshall_error(res));
-        }
-        return creation_result<Texture>::ok(vtexture);
+        if(res < 0) return creation_result<Texture>::err(marshall_error(res));
+        return creation_result<Texture>::ok(vtexture.release());
     }
-    creation_result<Fence> Device::CreateFence(Fence** fence, std::uint64_t val)
+    creation_result<Fence> Device::CreateFence( std::uint64_t val)
     {
-        vFence* vfence = new vFence;
+        std::unique_ptr<vFence> vfence = std::make_unique<vFence>();
         VkSemaphoreTypeCreateInfo timelineCreateInfo;
         timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
         timelineCreateInfo.pNext = NULL;
@@ -522,22 +516,18 @@ namespace RHI
         VkResult res = vkCreateSemaphore((VkDevice)ID, &createInfo, NULL, &timelineSemaphore);
         vfence->ID = timelineSemaphore;
         vfence->device = make_ptr(this);
-        
-        if(res < 0)
-        {
-            delete vfence;
-            return creation_result<Fence>::err(marshall_error(res));
-        }
-        return creation_result<Fence>::ok(vfence);
+
+        if(res < 0) return creation_result<Fence>::err(marshall_error(res));
+        return creation_result<Fence>::ok(vfence.release());
     }
-    creation_result<Buffer> Device::CreateBuffer(BufferDesc* desc, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
+    creation_result<Buffer> Device::CreateBuffer(const BufferDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
     {
-        vBuffer* vbuffer = new vBuffer;
+        std::unique_ptr<vBuffer> vbuffer = std::make_unique<vBuffer>();
         VkBufferCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        info.size = desc->size;
-        info.usage = VkBufferUsage(desc->usage);
+        info.size = desc.size;
+        info.usage = VkBufferUsage(desc.usage);
         vbuffer->device = make_ptr(this);
         if (type == ResourceType::Automatic)
         {
@@ -549,109 +539,86 @@ namespace RHI
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
             VkResult res = vmaCreateBuffer(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkBuffer*)&vbuffer->ID, &vbuffer->vma_ID, nullptr);
-            
-            if(res < 0)
-            {
-                delete vbuffer;
-                creation_result<Buffer>::err(marshall_error(res));
-            }
+
+            if(res < 0) creation_result<Buffer>::err(marshall_error(res));
             return creation_result<Buffer>::ok(vbuffer);
         }
         vbuffer->offset = offset;
-        vbuffer->size = desc->size;
+        vbuffer->size = desc.size;
         VkResult res = vkCreateBuffer((VkDevice)ID, &info, nullptr, (VkBuffer*)&vbuffer->ID);
-        if(res < 0)
-        {
-            delete vbuffer;
-            return creation_result<Buffer>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         if (type == ResourceType::Commited)
         {
-            RHI::HeapDesc hdesc;
-            RHI::MemoryReqirements req;
-            GetBufferMemoryRequirements(desc, &req);
-            hdesc.props = *props;
-            hdesc.size = req.size;
-            auto r = CreateHeap(&hdesc, nullptr);
-            if(r.is_err())
-            {
-                delete vbuffer;
-                return r.transform([](Ptr<Heap>&)->Ptr<Buffer>{return nullptr;});
-            }
+            MemoryReqirements req = GetBufferMemoryRequirements(desc);
+            auto r = CreateHeap(HeapDesc{req.size, *props}, nullptr);
+            if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Buffer>{return nullptr;});
             vbuffer->heap = r.value();
             res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)vbuffer->heap->ID, 0);
-            if(res < 0)
-            {
-                delete vbuffer;
-                return creation_result<Buffer>::err(marshall_error(res));
-            }
+            if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
             vbuffer->heap = heap;
             res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)heap->ID, offset);
-            if(res < 0)
-            {
-                delete vbuffer;
-                return creation_result<Buffer>::err(marshall_error(res));
-            }
+            if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
-        
 
-        return creation_result<Buffer>::ok(vbuffer);
+        return creation_result<Buffer>::ok(vbuffer.release());
     }
-    void Device::GetBufferMemoryRequirements(BufferDesc* desc, MemoryReqirements* requirements)
+    MemoryReqirements Device::GetBufferMemoryRequirements(const BufferDesc& desc)
     {
         VkBufferCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        info.size = desc->size;
-        info.usage = desc->usage == BufferUsage::VertexBuffer ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        info.size = desc.size;
+        info.usage = desc.usage == BufferUsage::VertexBuffer ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         VkDeviceBufferMemoryRequirements DeviceReq{};
         DeviceReq.sType = VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS;
         DeviceReq.pCreateInfo = &info;
         VkMemoryRequirements2 req{};
         req.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
         vkGetDeviceBufferMemoryRequirementsKHR((VkDevice)ID, &DeviceReq, &req);
-        requirements->alignment = req.memoryRequirements.alignment;
-        requirements->size = req.memoryRequirements.size;
-        requirements->memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        MemoryReqirements requirements;
+        requirements.alignment = req.memoryRequirements.alignment;
+        requirements.size = req.memoryRequirements.size;
+        requirements.memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        return requirements;
     }
-    creation_result<Heap> Device::CreateHeap(HeapDesc* desc, bool* usedFallback)
+    creation_result<Heap> Device::CreateHeap(const HeapDesc& desc, bool* usedFallback)
     {
         vHeap* vheap = new vHeap;
         if(usedFallback)*usedFallback = false;
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = desc->size;
+        allocInfo.allocationSize = desc.size;
         uint32_t MemIndex = UINT32_MAX;
-        if (desc->props.type == HeapType::Custom)
+        if (desc.props.type == HeapType::Custom)
         {
             uint32_t iterator = 0;
             for (auto& prop : ((vDevice*)this)->HeapProps)
             {
-                if (prop.memoryLevel != desc->props.memoryLevel) { iterator++; continue; }
-                if (prop.pageProperty != CPUPageProperty::NonVisible && desc->props.pageProperty == CPUPageProperty::Any)
+                if (prop.memoryLevel != desc.props.memoryLevel) { iterator++; continue; }
+                if (prop.pageProperty != CPUPageProperty::NonVisible && desc.props.pageProperty == CPUPageProperty::Any)
                 {
                     MemIndex = iterator;
                     iterator++;
                     continue;
                 }
-                if (prop.pageProperty != desc->props.pageProperty) {iterator++; continue;}
+                if (prop.pageProperty != desc.props.pageProperty) {iterator++; continue;}
             }
             if (MemIndex == UINT32_MAX)
             {
                 if(usedFallback)*usedFallback = true;
-                if (desc->props.FallbackType == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
-                if (desc->props.FallbackType == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
-                if (desc->props.FallbackType == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
+                if (desc.props.FallbackType == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
+                if (desc.props.FallbackType == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
+                if (desc.props.FallbackType == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
             }
         }
         else
         {
-            if (desc->props.type == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
-            if (desc->props.type == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
-            if (desc->props.type == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
+            if (desc.props.type == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
+            if (desc.props.type == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
+            if (desc.props.type == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
         }
         allocInfo.memoryTypeIndex = MemIndex;
         VkResult res = vkAllocateMemory((VkDevice)ID, &allocInfo, nullptr, (VkDeviceMemory*)&vheap->ID);
@@ -698,9 +665,9 @@ namespace RHI
         vRootSignature* vrootSignature = new vRootSignature;
         VkDescriptorSetLayout descriptorSetLayout[20];
         VkDescriptorSetLayoutCreateInfo layoutInfo[20]{};
-        
+
         VkPushConstantRange pushConstantRanges[20];
-        
+
         VkResult res;
 
         //uint32_t minSetIndex = UINT32_MAX;
@@ -710,8 +677,8 @@ namespace RHI
         {
             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
             {
-                GFX_ASSERT(desc->rootParameters[i].dynamicDescriptor.type == RHI::DescriptorType::ConstantBufferDynamic
-                || desc->rootParameters[i].dynamicDescriptor.type == RHI::DescriptorType::StructuredBufferDynamic);
+                GFX_ASSERT(desc->rootParameters[i].dynamicDescriptor.type == DescriptorType::ConstantBufferDynamic
+                || desc->rootParameters[i].dynamicDescriptor.type == DescriptorType::StructuredBufferDynamic);
                 VkDescriptorSetLayoutBinding binding;
                 binding.binding = 0;
                 binding.descriptorCount = 1;
@@ -767,7 +734,7 @@ namespace RHI
                     delete vrootSignature;
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
-                pSetLayouts[numLayouts] = &vSetLayouts[numLayouts];
+                pSetLayouts[numLayouts] = make_ptr(&vSetLayouts[numLayouts]);
                 vSetLayouts[numLayouts].device = make_ptr(this);
                 numLayouts++;
             }
@@ -787,7 +754,7 @@ namespace RHI
         pipelineLayoutInfo.pSetLayouts = layoutInfoSorted;
         pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
         pipelineLayoutInfo.pushConstantRangeCount = pcIndex;
-        
+
         res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
         if(res < 0)
         {
@@ -869,81 +836,81 @@ namespace RHI
             break;
         }
     }
-    creation_result<PipelineStateObject> Device::CreatePipelineStateObject(PipelineStateObjectDesc* desc)
+    creation_result<PipelineStateObject> Device::CreatePipelineStateObject(const PipelineStateObjectDesc& desc)
     {
         vPipelineStateObject* vPSO = new vPipelineStateObject;
         GFX_ASSERT(desc->numInputElements < 5);
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
         int index = 0;
-        if (desc->VS.data)
+        if (desc.VS.data)
         {
-            if(desc->shaderMode == File)
-                CreateShaderModule(desc->VS.data, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
+            if(desc.shaderMode == File)
+                CreateShaderModule(desc.VS.data, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
             else
-                CreateShaderModule(desc->VS.data,desc->VS.size, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
+                CreateShaderModule(desc.VS.data,desc.VS.size, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
 
             index++;
         }
-        if (desc->PS.data) 
+        if (desc.PS.data)
         {
-            if (desc->shaderMode == File)
-                CreateShaderModule(desc->PS.data, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
+            if (desc.shaderMode == File)
+                CreateShaderModule(desc.PS.data, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
             else
-                CreateShaderModule(desc->PS.data, desc->PS.size, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
+                CreateShaderModule(desc.PS.data, desc.PS.size, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
             index++;
         }
-        if (desc->GS.data)
+        if (desc.GS.data)
         {
-            if(desc->shaderMode == File)
-                CreateShaderModule(desc->GS.data, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
+            if(desc.shaderMode == File)
+                CreateShaderModule(desc.GS.data, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
             else
-                CreateShaderModule(desc->GS.data, desc->GS.size, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
+                CreateShaderModule(desc.GS.data, desc.GS.size, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
             index++;
         }
-        if (desc->HS.data)
+        if (desc.HS.data)
         {
-            if (desc->shaderMode == File)
-                CreateShaderModule(desc->HS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
+            if (desc.shaderMode == File)
+                CreateShaderModule(desc.HS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
             else
-                CreateShaderModule(desc->HS.data,desc->HS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
+                CreateShaderModule(desc.HS.data,desc.HS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
             index++;
         }
-        if (desc->DS.data)
+        if (desc.DS.data)
         {
-            if (desc->shaderMode == File)
-                CreateShaderModule(desc->DS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
+            if (desc.shaderMode == File)
+                CreateShaderModule(desc.DS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
             else
-                CreateShaderModule(desc->DS.data,desc->DS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
-                
+                CreateShaderModule(desc.DS.data,desc.DS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
+
             index++;
         }
         VkVertexInputAttributeDescription inputAttribDesc[5];
         VkVertexInputBindingDescription inputbindingDesc[5];
-        for (uint32_t i = 0; i < desc->numInputElements ; i++)
+        for (uint32_t i = 0; i < desc.numInputElements ; i++)
         {
-            inputAttribDesc[i].format = FormatConv(desc->inputElements[i].format);
-            inputAttribDesc[i].location = desc->inputElements[i].location;
-            inputAttribDesc[i].offset = desc->inputElements[i].alignedByteOffset;
-            inputAttribDesc[i].binding = desc->inputElements[i].inputSlot;
+            inputAttribDesc[i].format = FormatConv(desc.inputElements[i].format);
+            inputAttribDesc[i].location = desc.inputElements[i].location;
+            inputAttribDesc[i].offset = desc.inputElements[i].alignedByteOffset;
+            inputAttribDesc[i].binding = desc.inputElements[i].inputSlot;
 
         }
-        for (uint32_t i = 0; i < desc->numInputBindings; i++)
+        for (uint32_t i = 0; i < desc.numInputBindings; i++)
         {
             inputbindingDesc[i].binding = i;
-            inputbindingDesc[i].inputRate = (VkVertexInputRate)desc->inputBindings[i].inputRate;
-            inputbindingDesc[i].stride = desc->inputBindings[i].stride;
+            inputbindingDesc[i].inputRate = (VkVertexInputRate)desc.inputBindings[i].inputRate;
+            inputbindingDesc[i].stride = desc.inputBindings[i].stride;
         }
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = desc->numInputBindings;
+        vertexInputInfo.vertexBindingDescriptionCount = desc.numInputBindings;
         vertexInputInfo.pVertexBindingDescriptions = inputbindingDesc; // Optional
-        vertexInputInfo.vertexAttributeDescriptionCount = desc->numInputElements;
+        vertexInputInfo.vertexAttributeDescriptionCount = desc.numInputElements;
         vertexInputInfo.pVertexAttributeDescriptions = inputAttribDesc; // Optional
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        inputAssembly.topology = vkPrimitiveTopology(desc->rasterizerMode.topology);
+        inputAssembly.topology = vkPrimitiveTopology(desc.rasterizerMode.topology);
         inputAssembly.primitiveRestartEnable = VK_FALSE;
 
         VkDynamicState dynamicStates[] = {
@@ -969,7 +936,7 @@ namespace RHI
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
-        rasterizer.cullMode = VkCullMode(desc->rasterizerMode.cullMode);
+        rasterizer.cullMode = VkCullMode(desc.rasterizerMode.cullMode);
         rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
         rasterizer.depthBiasConstantFactor = 0.0f; // Optional
@@ -1006,35 +973,35 @@ namespace RHI
         colorBlending.blendConstants[1] = 0.0f; // Optional
         colorBlending.blendConstants[2] = 0.0f; // Optional
         colorBlending.blendConstants[3] = 0.0f; // Optional
-        
+
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
-        depthStencil.depthTestEnable = desc->depthStencilMode.DepthEnable;
-        depthStencil.depthCompareOp = vkCompareFunc(desc->depthStencilMode.DepthFunc);
-        depthStencil.depthWriteEnable = desc->depthStencilMode.DepthWriteMask == DepthWriteMask::All ? 1 : 0;
+        depthStencil.depthTestEnable = desc.depthStencilMode.DepthEnable;
+        depthStencil.depthCompareOp = vkCompareFunc(desc.depthStencilMode.DepthFunc);
+        depthStencil.depthWriteEnable = desc.depthStencilMode.DepthWriteMask == DepthWriteMask::All ? 1 : 0;
         //todo depth bounds
         depthStencil.flags = 0;
-        depthStencil.stencilTestEnable = desc->depthStencilMode.StencilEnable;
-        depthStencil.back.compareMask = desc->depthStencilMode.StencilReadMask;
-        depthStencil.back.writeMask = desc->depthStencilMode.StencilWriteMask;
-        depthStencil.back.compareOp = vkCompareFunc(desc->depthStencilMode.BackFace.Stencilfunc);
-        depthStencil.back.depthFailOp = vkStenOp(desc->depthStencilMode.BackFace.DepthfailOp);
-        depthStencil.back.failOp = vkStenOp(desc->depthStencilMode.BackFace.failOp);
-        depthStencil.back.passOp = vkStenOp(desc->depthStencilMode.BackFace.passOp);
-        depthStencil.front.compareMask = desc->depthStencilMode.StencilReadMask;
-        depthStencil.front.writeMask = desc->depthStencilMode.StencilWriteMask;
-        depthStencil.front.compareOp = vkCompareFunc(desc->depthStencilMode.FrontFace.Stencilfunc);
-        depthStencil.front.depthFailOp = vkStenOp(desc->depthStencilMode.FrontFace.DepthfailOp);
-        depthStencil.front.failOp = vkStenOp(desc->depthStencilMode.FrontFace.failOp);
-        depthStencil.front.passOp = vkStenOp(desc->depthStencilMode.FrontFace.passOp);
+        depthStencil.stencilTestEnable = desc.depthStencilMode.StencilEnable;
+        depthStencil.back.compareMask = desc.depthStencilMode.StencilReadMask;
+        depthStencil.back.writeMask = desc.depthStencilMode.StencilWriteMask;
+        depthStencil.back.compareOp = vkCompareFunc(desc.depthStencilMode.BackFace.Stencilfunc);
+        depthStencil.back.depthFailOp = vkStenOp(desc.depthStencilMode.BackFace.DepthfailOp);
+        depthStencil.back.failOp = vkStenOp(desc.depthStencilMode.BackFace.failOp);
+        depthStencil.back.passOp = vkStenOp(desc.depthStencilMode.BackFace.passOp);
+        depthStencil.front.compareMask = desc.depthStencilMode.StencilReadMask;
+        depthStencil.front.writeMask = desc.depthStencilMode.StencilWriteMask;
+        depthStencil.front.compareOp = vkCompareFunc(desc.depthStencilMode.FrontFace.Stencilfunc);
+        depthStencil.front.depthFailOp = vkStenOp(desc.depthStencilMode.FrontFace.DepthfailOp);
+        depthStencil.front.failOp = vkStenOp(desc.depthStencilMode.FrontFace.failOp);
+        depthStencil.front.passOp = vkStenOp(desc.depthStencilMode.FrontFace.passOp);
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 
         VkPipelineRenderingCreateInfo pipelineRendereing{};
-        pipelineRendereing.colorAttachmentCount = desc->numRenderTargets;//todo
-        pipelineRendereing.depthAttachmentFormat = FormatConv(desc->DSVFormat);
+        pipelineRendereing.colorAttachmentCount = desc.numRenderTargets;//todo
+        pipelineRendereing.depthAttachmentFormat = FormatConv(desc.DSVFormat);
         VkFormat format[10];
-        for (uint32_t i = 0; i < desc->numRenderTargets; i++)
+        for (uint32_t i = 0; i < desc.numRenderTargets; i++)
         {
-            format[i] = FormatConv(desc->RTVFormats[0]);
+            format[i] = FormatConv(desc.RTVFormats[0]);
         }
         pipelineRendereing.pColorAttachmentFormats = format;
         pipelineRendereing.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -1052,15 +1019,15 @@ namespace RHI
         pipelineInfo.pDepthStencilState = &depthStencil; // Optional
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = (VkPipelineLayout)desc->rootSig->ID;
+        pipelineInfo.layout = (VkPipelineLayout)desc.rootSig->ID;
         pipelineInfo.renderPass = nullptr;
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
         pipelineInfo.basePipelineIndex = -1; // Optional
-        
+
 
         vPSO->device = make_ptr(this);
-        
+
         VkResult res = vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
         if(res < 0)
         {
@@ -1071,13 +1038,14 @@ namespace RHI
             vkDestroyShaderModule((VkDevice)ID, modules[i], nullptr);
         return creation_result<PipelineStateObject>::ok(vPSO);
     }
-    RESULT Device::CreateDescriptorSets(DescriptorHeap* heap, std::uint32_t numDescriptorSets, DescriptorSetLayout* layouts, DescriptorSet** pSets)
+    creation_array_result<DescriptorSet> Device::CreateDescriptorSets(Ptr<DescriptorHeap> heap, std::uint32_t numDescriptorSets, Ptr<DescriptorSetLayout>* layouts)
     {
-        vDescriptorSet* vSets = new vDescriptorSet[numDescriptorSets];
+        std::unique_ptr<vDescriptorSet[]> vSets(new vDescriptorSet[numDescriptorSets]);
+        std::vector<Ptr<DescriptorSet>> returnValues;
         VkDescriptorSetLayout vklayouts[5];
         for (uint32_t i = 0; i < numDescriptorSets; i++)
         {
-            vklayouts[i] = (VkDescriptorSetLayout)layouts[i].ID;
+            vklayouts[i] = (VkDescriptorSetLayout)layouts[i]->ID;
         }
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1086,24 +1054,30 @@ namespace RHI
         allocInfo.pSetLayouts = vklayouts;
         VkDescriptorSet descriptorSets[5];
         VkResult res = vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, descriptorSets);
+        if(res < 0) return creation_array_result<DescriptorSet>::err(marshall_error(res));
+
         for (uint32_t i = 0; i < numDescriptorSets; i++)
         {
             vSets[i].ID = descriptorSets[i];
-            pSets[i] = &vSets[i];
+            vSets[i].device = make_ptr(this);
+            vSets[i].heap = heap;
+            vSets[i].layout = layouts[i];
+            auto array = vSets.release();
+            returnValues.push_back(&array[i]);
         }
-        return res;
+        return creation_array_result<DescriptorSet>::ok(returnValues);
     }
     Texture* Device::WrapNativeTexture(Internal_ID id)
     {
         RHI::vTexture* vtex = new RHI::vTexture;
         vtex->ID = id;
         vtex->device = make_ptr(this);
-        
+
         return vtex;
     }
-    void Device::UpdateDescriptorSets(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, DescriptorSet* sets)
+    void Device::UpdateDescriptorSet(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, Weak<DescriptorSet> sets)
     {
-        
+
         VkWriteDescriptorSet writes[5]{};
         VkDescriptorBufferInfo Binfo[5]{ };
         VkDescriptorImageInfo Iinfo[5]{ };
@@ -1173,7 +1147,7 @@ namespace RHI
             writes[i].descriptorCount = desc->numDescriptors;
         }
         vkUpdateDescriptorSets((VkDevice)ID, numDescs, writes, 0, nullptr);
-        
+
     }
     VkImageType ImageType(TextureType type)
     {
@@ -1206,9 +1180,9 @@ namespace RHI
 
         return flags;
     }
-    creation_result<DynamicDescriptor> Device::CreateDynamicDescriptor(DescriptorHeap* heap, DescriptorType type,ShaderStage stage, RHI::Buffer* buffer,uint32_t offset,uint32_t size)
+    creation_result<DynamicDescriptor> Device::CreateDynamicDescriptor(Ptr<DescriptorHeap> heap, DescriptorType type,ShaderStage stage, Weak<Buffer> buffer,uint32_t offset,uint32_t size)
     {
-        if(type != DescriptorType::ConstantBufferDynamic || type != DescriptorType::StructuredBufferDynamic || heap == nullptr)
+        if(type != DescriptorType::ConstantBufferDynamic || type != DescriptorType::StructuredBufferDynamic || heap.ptr == nullptr)
         {
             return creation_result<DynamicDescriptor>::err(CreationError::InvalidParameters);
         }
@@ -1225,16 +1199,11 @@ namespace RHI
         info.bindingCount = 1;
         info.flags = 0;
         info.pBindings = &binding;
-        
-        vDynamicDescriptor* vdescriptor = new vDynamicDescriptor();
+
+        std::unique_ptr<vDynamicDescriptor> vdescriptor = std::make_unique<vDynamicDescriptor>();
         res = vkCreateDescriptorSetLayout((VkDevice)ID, &info, nullptr, &vdescriptor->layout);
-        
-        if(res < 0)
-        {
-            delete vdescriptor;
-            return creation_result<DynamicDescriptor>::err(marshall_error(res));
-        }
-            
+
+        if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1242,16 +1211,11 @@ namespace RHI
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &vdescriptor->layout;
         res = vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, (VkDescriptorSet*)&vdescriptor->ID);
-        
-        if(res < 0)
-        {
-            delete vdescriptor;
-            return creation_result<DynamicDescriptor>::err(marshall_error(res));
-        }
-        
+
+        if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
+
         vdescriptor->device = make_ptr(this);
-        
-        vdescriptor->heap = (vDescriptorHeap*)heap;
+        vdescriptor->heap = heap;
         VkDescriptorBufferInfo binfo{};
         binfo.buffer = (VkBuffer)buffer->ID;
         binfo.offset = offset;
@@ -1265,24 +1229,24 @@ namespace RHI
         vkUpdateDescriptorSets((VkDevice)ID, 1,&write, 0, nullptr);
         return creation_result<DynamicDescriptor>::ok(vdescriptor);
     }
-    creation_result<Texture> Device::CreateTexture(TextureDesc* desc, Texture** texture, Heap* heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
+    creation_result<Texture> Device::CreateTexture(const TextureDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
     {
-        vTexture* vtexture = new vTexture;
+        std::unique_ptr<vTexture> vtexture = std::make_unique<vTexture>();
         VkImageCreateInfo info{};
-        info.arrayLayers = desc->type == TextureType::Texture3D ? 1 : desc->depthOrArraySize;
-        info.extent.width = desc->width;
-        info.extent.height = desc->height;
-        info.extent.depth = desc->type == TextureType::Texture3D ? desc->depthOrArraySize : 1;
+        info.arrayLayers = desc.type == TextureType::Texture3D ? 1 : desc.depthOrArraySize;
+        info.extent.width = desc.width;
+        info.extent.height = desc.height;
+        info.extent.depth = desc.type == TextureType::Texture3D ? desc.depthOrArraySize : 1;
         VkImageCreateFlags flags = 0;
-        if ((desc->usage & TextureUsage::CubeMap) != TextureUsage::None) flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        if ((desc.usage & TextureUsage::CubeMap) != TextureUsage::None) flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
         info.flags = flags;
-        info.format = FormatConv(desc->format);
-        info.imageType = ImageType(desc->type);
+        info.format = FormatConv(desc.format);
+        info.imageType = ImageType(desc.type);
         info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        info.mipLevels = desc->mipLevels;
+        info.mipLevels = desc.mipLevels;
         info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        info.tiling = ImageTiling(desc->mode);
-        info.usage = ImageUsage(desc->usage);
+        info.tiling = ImageTiling(desc.mode);
+        info.usage = ImageUsage(desc.usage);
         info.samples = VK_SAMPLE_COUNT_1_BIT;
         vtexture->device = make_ptr(this);
         if (type == ResourceType::Automatic)
@@ -1295,67 +1259,43 @@ namespace RHI
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
             VkResult res = vmaCreateImage(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkImage*)&vtexture->ID, &vtexture->vma_ID, nullptr);
-            if(res < 0)
-            {
-                delete vtexture;
-                return creation_result<Texture>::err(marshall_error(res));
-            }
+            if(res < 0) return creation_result<Texture>::err(marshall_error(res));
             return creation_result<Texture>::ok(vtexture);
         }
         VkResult res = vkCreateImage((VkDevice)ID, &info, nullptr, (VkImage*)&vtexture->ID);
-        if(res < 0)
-        {
-            delete vtexture;
-            return creation_result<Texture>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         if (type == ResourceType::Commited)
         {
-            RHI::HeapDesc hdesc;
-            RHI::MemoryReqirements req;
-            GetTextureMemoryRequirements(desc, &req);
-            hdesc.props = *props;
-            hdesc.size = req.size;
-            auto r = CreateHeap(&hdesc, nullptr);
-            if(r.is_err())
-            {
-                delete vtexture;
-                return r.transform([](Ptr<Heap>&)->Ptr<Texture>{return nullptr;});
-            }
+            MemoryReqirements req = GetTextureMemoryRequirements(desc);
+            auto r = CreateHeap(HeapDesc{req.size, *props}, nullptr);
+            if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Texture>{return nullptr;});
             vtexture->heap = r.value();
             res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)vtexture->heap->ID, 0);
-            if(res < 0)
-            {
-                delete vtexture;
-                return creation_result<Texture>::err(marshall_error(res));
-            }
+            if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
             vtexture->heap = heap;
             res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)heap->ID, offset);
-            if(res < 0)
-            {
-                delete vtexture;
-                return creation_result<Texture>::err(marshall_error(res));
-            }
+            if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
         return creation_result<Texture>::ok(vtexture);
     }
-    void Device::GetTextureMemoryRequirements(TextureDesc* desc, MemoryReqirements* requirements)
+    MemoryReqirements Device::GetTextureMemoryRequirements(const TextureDesc& desc)
     {
         VkImageCreateInfo info{};
-        info.arrayLayers = desc->type == TextureType::Texture3D ? 1 : desc->depthOrArraySize;
-        info.extent.width = desc->width;
-        info.extent.height = desc->height;
-        info.extent.depth = desc->type == TextureType::Texture3D ? desc->depthOrArraySize : 1;
+        info.arrayLayers = desc.type == TextureType::Texture3D ? 1 : desc.depthOrArraySize;
+        info.extent.width = desc.width;
+        info.extent.height = desc.height;
+        info.extent.depth = desc.type == TextureType::Texture3D ? desc.depthOrArraySize : 1;
         info.flags = 0;
-        info.format = FormatConv(desc->format);
-        info.imageType = ImageType(desc->type);
+        info.format = FormatConv(desc.format);
+        info.imageType = ImageType(desc.type);
         info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        info.mipLevels = desc->mipLevels;
+        info.mipLevels = desc.mipLevels;
         info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        info.tiling = ImageTiling(desc->mode);
-        info.usage = ImageUsage(desc->usage);
+        info.tiling = ImageTiling(desc.mode);
+        info.usage = ImageUsage(desc.usage);
         info.samples = VK_SAMPLE_COUNT_1_BIT;
         VkDeviceImageMemoryRequirements DeviceReq{};
         DeviceReq.sType = VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS;
@@ -1363,9 +1303,11 @@ namespace RHI
         VkMemoryRequirements2 req{};
         req.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
         vkGetDeviceImageMemoryRequirementsKHR((VkDevice)ID, &DeviceReq, &req);
-        requirements->alignment = req.memoryRequirements.alignment;
-        requirements->size = req.memoryRequirements.size;
-        requirements->memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        MemoryReqirements requirements;
+        requirements.alignment = req.memoryRequirements.alignment;
+        requirements.size = req.memoryRequirements.size;
+        requirements.memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        return requirements;
     }
     static VkImageViewType VkViewType(TextureViewType type)
     {
@@ -1383,7 +1325,7 @@ namespace RHI
             break;
         }
     }
-    creation_result<TextureView> Device::CreateTextureView(TextureViewDesc* desc)
+    creation_result<TextureView> Device::CreateTextureView(const TextureViewDesc& desc)
     {
         VkImageViewCreateInfo info{};
         info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1391,17 +1333,17 @@ namespace RHI
         info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.flags = 0;
-        info.format = FormatConv(desc->format);
-        info.image = (VkImage)desc->texture->ID;
+        info.format = FormatConv(desc.format);
+        info.image = (VkImage)desc.texture->ID;
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         VkImageSubresourceRange range;
-        range.aspectMask = (VkImageAspectFlags)desc->range.imageAspect;
-        range.baseMipLevel =                   desc->range.IndexOrFirstMipLevel;
-        range.baseArrayLayer =                 desc->range.FirstArraySlice;
-        range.layerCount =                     desc->range.NumArraySlices;
-        range.levelCount =                     desc->range.NumMipLevels;
+        range.aspectMask = (VkImageAspectFlags)desc.range.imageAspect;
+        range.baseMipLevel =                   desc.range.IndexOrFirstMipLevel;
+        range.baseArrayLayer =                 desc.range.FirstArraySlice;
+        range.layerCount =                     desc.range.NumArraySlices;
+        range.levelCount =                     desc.range.NumMipLevels;
         info.subresourceRange = range;
-        info.viewType = VkViewType(desc->type);
+        info.viewType = VkViewType(desc.type);
         vTextureView* vtview = new vTextureView;
         VkResult res = vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)&vtview->ID);
         if(res < 0)
@@ -1435,46 +1377,42 @@ namespace RHI
     {
         return (mode == Filter::Linear) ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
     }
-    CreationError Device::CreateSampler(SamplerDesc* desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateSampler(const SamplerDesc& desc, CPU_HANDLE heapHandle)
     {
         VkSamplerCreateInfo info;
-        info.addressModeU = VkAddressMode(desc->AddressU);
-        info.addressModeV = VkAddressMode(desc->AddressV);
-        info.addressModeW = VkAddressMode(desc->AddressW);
+        info.addressModeU = VkAddressMode(desc.AddressU);
+        info.addressModeV = VkAddressMode(desc.AddressV);
+        info.addressModeW = VkAddressMode(desc.AddressW);
         info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        info.anisotropyEnable = desc->anisotropyEnable;
-        info.compareEnable = desc->compareEnable;
-        info.compareOp = vkCompareFunc(desc->compareFunc);
+        info.anisotropyEnable = desc.anisotropyEnable;
+        info.compareEnable = desc.compareEnable;
+        info.compareOp = vkCompareFunc(desc.compareFunc);
         info.flags = 0;
-        info.magFilter = vkFilter(desc->magFilter);
-        info.maxAnisotropy = desc->maxAnisotropy;
-        info.maxLod = desc->maxLOD == FLT_MAX ? VK_LOD_CLAMP_NONE : desc->maxLOD;
-        info.minFilter = vkFilter(desc->minFilter);
-        info.minLod = desc->minLOD;
-        info.mipLodBias = desc->mipLODBias;
-        info.mipmapMode = vkMipMode(desc->mipFilter);
+        info.magFilter = vkFilter(desc.magFilter);
+        info.maxAnisotropy = desc.maxAnisotropy;
+        info.maxLod = desc.maxLOD == FLT_MAX ? VK_LOD_CLAMP_NONE : desc.maxLOD;
+        info.minFilter = vkFilter(desc.minFilter);
+        info.minLod = desc.minLOD;
+        info.mipLodBias = desc.mipLODBias;
+        info.mipmapMode = vkMipMode(desc.mipFilter);
         info.pNext = 0;
         info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         info.unnormalizedCoordinates = VK_FALSE;
         return marshall_error(vkCreateSampler((VkDevice)ID, &info, nullptr, (VkSampler*)heapHandle.ptr));
     }
-    creation_result<ComputePipeline> Device::CreateComputePipeline(ComputePipelineDesc* desc)
+    creation_result<ComputePipeline> Device::CreateComputePipeline(const ComputePipelineDesc& desc)
     {
-        vComputePipeline* vpipeline = new vComputePipeline;
+        std::unique_ptr<vComputePipeline> vpipeline = std::make_unique<vComputePipeline>();
         vpipeline->device = make_ptr(this);
         VkComputePipelineCreateInfo info{};
-        info.layout = (VkPipelineLayout)desc->rootSig->ID;
+        info.layout = (VkPipelineLayout)desc.rootSig->ID;
         VkShaderModule module;
-        if (desc->mode == ShaderMode::File) CreateShaderModule(desc->CS.data, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
-        else CreateShaderModule(desc->CS.data, desc->CS.size, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
+        if (desc.mode == ShaderMode::File) CreateShaderModule(desc.CS.data, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
+        else CreateShaderModule(desc.CS.data, desc.CS.size, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
         VkResult res = vkCreateComputePipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &info, nullptr, (VkPipeline*)&vpipeline->ID);
-        
-        if(res < 0)
-        {
-            delete vpipeline;
-            return creation_result<ComputePipeline>::err(marshall_error(res));
-        }
+
+        if(res < 0) return creation_result<ComputePipeline>::err(marshall_error(res));
         vkDestroyShaderModule((VkDevice)ID, module, nullptr);
         return creation_result<ComputePipeline>::ok(vpipeline);
     }

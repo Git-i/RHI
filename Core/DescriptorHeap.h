@@ -12,25 +12,33 @@ namespace RHI
 	public:
 		CPU_HANDLE GetCpuHandle();
 	};
+
 	class RHI_API DescriptorSetLayout : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(DescriptorSetLayout);
-		
 	};
+
 	class RHI_API DescriptorSet : public Object
 	{
 	protected:
-		DECL_CLASS_CONSTRUCTORS(DescriptorSet);
+	    DECL_CLASS_CONSTRUCTORS(DescriptorSet);
+	public:
+	    Ptr<DescriptorSetLayout> GetLayout();
+	    Ptr<DescriptorHeap> GetHeap();
 	};
+
 	class RHI_API DynamicDescriptor : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(DynamicDescriptor);
+	public:
+	    Ptr<DescriptorHeap> GetHeap();
 	};
+
 	struct DescriptorBufferInfo
 	{
-		Buffer* buffer;
+		Weak<Buffer> buffer;
 		std::uint32_t offset;
 		std::uint32_t range;
 	};
@@ -40,7 +48,7 @@ namespace RHI
 	};
 	struct DescriptorTextureInfo
 	{
-		TextureView* texture;
+		Weak<TextureView> texture;
 	};
 	struct DescriptorSamplerInfo
 	{

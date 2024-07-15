@@ -35,7 +35,6 @@ namespace RHI
 		MemoryLevel memoryLevel;
 		HeapType FallbackType;
 		HeapProperties() { memset(this, 0, sizeof(HeapProperties)); };
-		HeapProperties(Default_t) {memset(this, 0, sizeof(HeapProperties));};
 	};
 	struct RHI_API HeapDesc
 	{

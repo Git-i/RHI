@@ -1,6 +1,6 @@
 #pragma once
 #include "Object.h"
-
+#include "FormatsAndTypes.h"
 namespace RHI
 {
 	class RHI_API  Texture : public Object
@@ -11,14 +11,14 @@ namespace RHI
 		void Map(void** data);
 		void UnMap();
 	};
-	
+
 	enum class TextureType
 	{
 		Texture1D, Texture2D, Texture3D
 	};
 	enum class TextureTilingMode
 	{
-		Linear, Optimal 
+		Linear, Optimal
 	};
 	enum class TextureUsage
 	{

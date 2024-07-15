@@ -28,34 +28,34 @@ namespace RHI
 	{
 	public:
 		//CommandAllocator Passed must be the one used to create the command list.
-		RESULT CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent,Texture* src,Texture*dst);
-		RESULT Begin(CommandAllocator* allocator);
-		RESULT PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
-		RESULT ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
-		RESULT SetPipelineState(PipelineStateObject* pso);
-		RESULT SetComputePipeline(ComputePipeline* cp);
-		RESULT BindComputeDescriptorSet(DescriptorSet* set, std::uint32_t setIndex);
-		RESULT BindComputeDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
-		RESULT SetDescriptorHeap(DescriptorHeap* heap);
-		RESULT BindDescriptorSet(DescriptorSet* set, std::uint32_t setIndex);
-		RESULT BindDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset);
-		RESULT SetScissorRects(uint32_t numRects, Area2D* rects);
-		RESULT SetViewports(uint32_t numViewports, Viewport* viewports);
-		RESULT CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Buffer* srcBuffer, Buffer* dstBuffer);
-		RESULT CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Buffer* buffer, Texture* texture);
-		RESULT Draw(uint32_t numVertices, uint32_t numInstances, uint32_t firstVertex, uint32_t firstInstance);
-		RESULT DrawIndexed(uint32_t IndexCount, uint32_t InstanceCount, uint32_t startIndexLocation, uint32_t startVertexLocation, uint32_t startInstanceLocation);
-		RESULT Dispatch(uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ);
-		RESULT BeginRendering(const RenderingBeginDesc* desc);
-		RESULT BindVertexBuffers(uint32_t startSlot, uint32_t numBuffers,const Internal_ID* buffers);
-		RESULT BindIndexBuffer(const Buffer* buffer, uint32_t offset);
-		RESULT SetRootSignature(RootSignature* rs);
-		RESULT EndRendering();
-		RESULT PushConstant(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
-		//todo
-		RESULT BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset, SubResourceRange srcRange, SubResourceRange dstRange);
-		RESULT MarkBuffer(Buffer* buffer, uint32_t offset, uint32_t val);
-		RESULT MarkBuffer(DebugBuffer* buffer, uint32_t val);
+		void CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent,Weak<Texture> src,Weak<Texture> dst);
+		RESULT Begin(Ptr<CommandAllocator> allocator);
+		void PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
+		void ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
+		void SetPipelineState(Weak<PipelineStateObject> pso);
+		void SetComputePipeline(Weak<ComputePipeline> cp);
+		void BindComputeDescriptorSet(Weak<DescriptorSet> set, std::uint32_t setIndex);
+		void BindComputeDynamicDescriptor(Weak<DynamicDescriptor> set, std::uint32_t setIndex, std::uint32_t offset);
+		void SetDescriptorHeap(Weak<DescriptorHeap> heap);
+		void BindDescriptorSet(Weak<DescriptorSet> set, std::uint32_t setIndex);
+		void BindDynamicDescriptor(Weak<DynamicDescriptor> set, std::uint32_t setIndex, std::uint32_t offset);
+		void SetScissorRects(uint32_t numRects, Area2D* rects);
+		void SetViewports(uint32_t numViewports, Viewport* viewports);
+		void CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Weak<Buffer> srcBuffer, Weak<Buffer> dstBuffer);
+		void CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture);
+		void Draw(uint32_t numVertices, uint32_t numInstances, uint32_t firstVertex, uint32_t firstInstance);
+		void DrawIndexed(uint32_t IndexCount, uint32_t InstanceCount, uint32_t startIndexLocation, uint32_t startVertexLocation, uint32_t startInstanceLocation);
+		void Dispatch(uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ);
+		void BeginRendering(const RenderingBeginDesc& desc);
+		void BindVertexBuffers(uint32_t startSlot, uint32_t numBuffers,const Internal_ID* buffers);
+		void BindIndexBuffer(Weak<Buffer> buffer, uint32_t offset);
+		void SetRootSignature(Weak<RootSignature> rs);
+		void EndRendering();
+		void PushConstant(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
+		//todo (properly)
+		void BlitTexture(Weak<Texture> src, Weak<Texture> dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset, SubResourceRange srcRange, SubResourceRange dstRange);
+		void MarkBuffer(Weak<Buffer> buffer, uint32_t offset, uint32_t val);
+		void MarkBuffer(Weak<DebugBuffer> buffer, uint32_t val);
 		//RESULT SetRenderTargetView(CPU_HANDLE rtv);
 		RESULT End();
 	};
@@ -78,5 +78,3 @@ namespace RHI
 	};
 
 }
-
-

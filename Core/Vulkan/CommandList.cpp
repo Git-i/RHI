@@ -1,7 +1,9 @@
+#include "FormatsAndTypes.h"
 #include "pch.h"
 #include "../CommandList.h"
 #include "volk.h"
 #include "VulkanSpecific.h"
+#include <type_traits>
 namespace RHI
 {
     static VkAttachmentLoadOp vloadOp(LoadOp op)
@@ -23,7 +25,7 @@ namespace RHI
         default: return VK_ATTACHMENT_STORE_OP_MAX_ENUM;
         }
     }
-    RESULT GraphicsCommandList::Begin(CommandAllocator* allocator)
+    RESULT GraphicsCommandList::Begin(Ptr<CommandAllocator> allocator)
     {
         VkCommandBufferBeginInfo bufferBeginInfo = {};
         bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -35,13 +37,13 @@ namespace RHI
         Info.commandBufferCount = 1;
         //vkFreeCommandBuffers((VkDevice)Device_ID, (VkCommandPool)(((vGraphicsCommandList*)this)->m_allocator), 1, (VkCommandBuffer*)&ID);
         //vkResetCommandBuffer((VkCommandBuffer)ID, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
-        vkAllocateCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, &Info, (VkCommandBuffer*)&ID);
+        vkAllocateCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, &Info, (VkCommandBuffer*)&ID);
         if(name) SetName(name);
-        ((vGraphicsCommandList*)this)->allocator = (vCommandAllocator*)allocator;
-        ((vCommandAllocator*)allocator)->m_pools.push_back(ID);
+        ((vGraphicsCommandList*)this)->allocator = allocator;
+        allocator.retrieve_as_forced<vCommandAllocator>()->m_pools.push_back(ID);
         return vkBeginCommandBuffer((VkCommandBuffer)ID, &bufferBeginInfo);
     }
-    uint32_t QueueFamilyInd(vDevice* device, QueueFamily fam)
+    uint32_t QueueFamilyInd(Weak<vDevice> device, QueueFamily fam)
     {
         switch (fam)
         {
@@ -57,7 +59,7 @@ namespace RHI
             break;
         }
     }
-    RESULT GraphicsCommandList::PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* bufferBarrier,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
+    void GraphicsCommandList::PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* bufferBarrier,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
     {
         VkBufferMemoryBarrier BufferBarr[10]{};
         VkImageMemoryBarrier ImageBarr[100]{};
@@ -66,8 +68,8 @@ namespace RHI
             BufferBarr[i].buffer = (VkBuffer)bufferBarrier[i].buffer->ID;
             BufferBarr[i].srcAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsBefore;
             BufferBarr[i].dstAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsAfter;
-            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), bufferBarrier[i].previousQueue);
-            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), bufferBarrier[i].nextQueue);
+            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), bufferBarrier[i].previousQueue);
+            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), bufferBarrier[i].nextQueue);
             if (BufferBarr[i].srcQueueFamilyIndex == BufferBarr[i].dstQueueFamilyIndex)
                 BufferBarr[i].srcQueueFamilyIndex = BufferBarr[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             BufferBarr[i].offset = bufferBarrier[i].offset;
@@ -82,8 +84,8 @@ namespace RHI
             ImageBarr[i].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
             ImageBarr[i].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
             ImageBarr[i].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue);
-            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue);
+            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue);
+            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue);
             VkImageSubresourceRange range;
             range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
             range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
@@ -95,64 +97,59 @@ namespace RHI
                 ImageBarr[i].srcQueueFamilyIndex = ImageBarr[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         }
         vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, numBufferBarriers, BufferBarr, numImageBarriers, ImageBarr);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BeginRendering(const RenderingBeginDesc* desc)
+    void GraphicsCommandList::BeginRendering(const RenderingBeginDesc& desc)
     {
         VkRenderingAttachmentInfo Attachmentinfos[5] = {};
-        for (uint32_t i = 0; i < desc->numColorAttachments; i++)
+        for (uint32_t i = 0; i < desc.numColorAttachments; i++)
         {
-            Attachmentinfos[i].clearValue.color = *(VkClearColorValue*)&desc->pColorAttachments[i].clearColor;
+            Attachmentinfos[i].clearValue.color = *(VkClearColorValue*)&desc.pColorAttachments[i].clearColor;
             Attachmentinfos[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            Attachmentinfos[i].imageView = *(VkImageView*)desc->pColorAttachments[i].ImageView.ptr;
-            Attachmentinfos[i].loadOp = vloadOp(desc->pColorAttachments[i].loadOp);
-            Attachmentinfos[i].storeOp = vStoreOp(desc->pColorAttachments[i].storeOp);
+            Attachmentinfos[i].imageView = *(VkImageView*)desc.pColorAttachments[i].ImageView.ptr;
+            Attachmentinfos[i].loadOp = vloadOp(desc.pColorAttachments[i].loadOp);
+            Attachmentinfos[i].storeOp = vStoreOp(desc.pColorAttachments[i].storeOp);
             Attachmentinfos[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         }
         VkRect2D render_area;
-        render_area.offset = { desc->renderingArea.offset.x,desc->renderingArea.offset.y };
-        render_area.extent = { desc->renderingArea.size.x,desc->renderingArea.size.y };
+        render_area.offset = { desc.renderingArea.offset.x,desc.renderingArea.offset.y };
+        render_area.extent = { desc.renderingArea.size.x,desc.renderingArea.size.y };
         VkRenderingInfo info = {};
         info.pColorAttachments = Attachmentinfos;
         VkRenderingAttachmentInfo depthAttach{};
-        if (desc->pDepthStencilAttachment)
+        if (desc.pDepthStencilAttachment)
         {
-            depthAttach.clearValue.color = *(VkClearColorValue*)&desc->pDepthStencilAttachment->clearColor;
+            depthAttach.clearValue.color = *(VkClearColorValue*)&desc.pDepthStencilAttachment->clearColor;
             depthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            depthAttach.imageView = *(VkImageView*)desc->pDepthStencilAttachment->ImageView.ptr;
-            depthAttach.loadOp = vloadOp(desc->pDepthStencilAttachment->loadOp);
-            depthAttach.storeOp = vStoreOp(desc->pDepthStencilAttachment->storeOp);
+            depthAttach.imageView = *(VkImageView*)desc.pDepthStencilAttachment->ImageView.ptr;
+            depthAttach.loadOp = vloadOp(desc.pDepthStencilAttachment->loadOp);
+            depthAttach.storeOp = vStoreOp(desc.pDepthStencilAttachment->storeOp);
             depthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
             info.pDepthAttachment = &depthAttach;
         }
-        info.colorAttachmentCount = desc->numColorAttachments;
+        info.colorAttachmentCount = desc.numColorAttachments;
         info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
         info.renderArea = render_area;
         info.layerCount = 1;
         vkCmdBeginRenderingKHR((VkCommandBuffer)ID, &info);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::PushConstant(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
+    void GraphicsCommandList::PushConstant(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
     {
-        vRootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
+        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdPushConstants((VkCommandBuffer)ID,(VkPipelineLayout)rs->ID,rs->pcBindingToStage[bindingIndex], offsetIn32BitSteps * sizeof(uint32_t), numConstants * sizeof(uint32_t), constants);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::EndRendering()
+    void GraphicsCommandList::EndRendering()
     {
         vkCmdEndRenderingKHR((VkCommandBuffer)ID);
-        return RESULT();
     }
     RESULT GraphicsCommandList::End()
     {
         return vkEndCommandBuffer((VkCommandBuffer)ID);
     }
-    RESULT GraphicsCommandList::SetPipelineState(PipelineStateObject* pso)
+    void GraphicsCommandList::SetPipelineState(Weak<PipelineStateObject> pso)
     {
         vkCmdBindPipeline((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipeline)pso->ID);
-        return 0;
     }
-    RESULT GraphicsCommandList::SetScissorRects(uint32_t numRects, Area2D* rects)
+    void GraphicsCommandList::SetScissorRects(uint32_t numRects, Area2D* rects)
     {
         VkRect2D scr[4];
         for (uint32_t i = 0; i < numRects; i++)
@@ -161,9 +158,8 @@ namespace RHI
             scr[i].offset = { rects[i].offset.x,rects[i].offset.y};
         }
         vkCmdSetScissor((VkCommandBuffer)ID, 0, numRects, scr);
-        return 0;
     }
-    RESULT GraphicsCommandList::SetViewports(uint32_t numViewports, Viewport* viewports)
+    void GraphicsCommandList::SetViewports(uint32_t numViewports, Viewport* viewports)
     {
         VkViewport vp[4];
         for (uint32_t i = 0; i < numViewports; i++)
@@ -176,56 +172,47 @@ namespace RHI
             vp[i].maxDepth = viewports[i].maxDepth;
         }
         vkCmdSetViewport((VkCommandBuffer)ID, 0, numViewports, vp);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::Draw(uint32_t numVertices, uint32_t numInstances, uint32_t firstVertex, uint32_t firstIndex)
+    void GraphicsCommandList::Draw(uint32_t numVertices, uint32_t numInstances, uint32_t firstVertex, uint32_t firstIndex)
     {
         vkCmdDraw((VkCommandBuffer)ID, numVertices, numInstances, firstVertex, firstIndex);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BindVertexBuffers(uint32_t startSlot, uint32_t numBuffers, const Internal_ID* buffers)
+    void GraphicsCommandList::BindVertexBuffers(uint32_t startSlot, uint32_t numBuffers, const Internal_ID* buffers)
     {
         VkDeviceSize l = 0;
         vkCmdBindVertexBuffers((VkCommandBuffer)ID, startSlot, numBuffers, (VkBuffer*)buffers, &l);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::SetRootSignature(RootSignature* rs)
+    void GraphicsCommandList::SetRootSignature(Weak<RootSignature> rs)
     {
-        ((vGraphicsCommandList*)this)->currentRS = (vRootSignature*)rs;
-        return RESULT();
-        
+        ((vGraphicsCommandList*)this)->currentRS = rs.ForceTransform<vRootSignature>();
     }
-    RESULT GraphicsCommandList::BindDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
+    void GraphicsCommandList::BindDynamicDescriptor(Weak<DynamicDescriptor> set, std::uint32_t setIndex, std::uint32_t offset)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
+        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets,1,&offset);
-        return 0;
     }
-    RESULT GraphicsCommandList::BindDescriptorSet(DescriptorSet* set, std::uint32_t setIndex)
+    void GraphicsCommandList::BindDescriptorSet(Weak<DescriptorSet> set, std::uint32_t setIndex)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
+        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_GRAPHICS, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::SetDescriptorHeap(DescriptorHeap* heap)
+    void GraphicsCommandList::SetDescriptorHeap(Weak<DescriptorHeap> heap)
     {
-        return 0;
+        //empty
     }
-    RESULT GraphicsCommandList::Dispatch(uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ)
+    void GraphicsCommandList::Dispatch(uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ)
     {
         vkCmdDispatch((VkCommandBuffer)ID, threadGroupCountX, threadGroupCountY, threadGroupCountZ);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BindIndexBuffer(const Buffer* buffer, uint32_t offset)
+    void GraphicsCommandList::BindIndexBuffer(Weak<Buffer> buffer, uint32_t offset)
     {
         vkCmdBindIndexBuffer((VkCommandBuffer)ID, (VkBuffer)buffer->ID, offset, VK_INDEX_TYPE_UINT32);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BlitTexture(Texture* src, Texture* dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset,SubResourceRange srcRange, SubResourceRange dstRange)
+    void GraphicsCommandList::BlitTexture(Weak<Texture> src, Weak<Texture> dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset,SubResourceRange srcRange, SubResourceRange dstRange)
     {
         VkImageSubresourceLayers src_lyrs;
         src_lyrs.aspectMask = (VkImageAspectFlags)srcRange.imageAspect;
@@ -241,38 +228,33 @@ namespace RHI
         blt.dstOffsets[0] = { dstOffset.width, dstOffset.height, dstOffset.depth };
         blt.dstOffsets[1] = { (int)(dstOffset.width + dstSize.width), (int)(dstOffset.height + dstSize.height),(int)(dstOffset.depth + dstSize.depth) };
         blt.srcOffsets[0] = { srcOffset.width, srcOffset.height, srcOffset.depth};
-        blt.srcOffsets[1] = 
+        blt.srcOffsets[1] =
         { (int)(srcOffset.width + srcSize.width), (int)(srcOffset.height + srcSize.height),(int)(srcOffset.depth + srcSize.depth)};
         blt.srcSubresource = src_lyrs;
         blt.dstSubresource = dst_lyrs;
         vkCmdBlitImage((VkCommandBuffer)ID, (VkImage)src->ID, VK_IMAGE_LAYOUT_GENERAL, (VkImage)dst->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blt, VK_FILTER_LINEAR);
-        return 0;
     }
-    RESULT GraphicsCommandList::MarkBuffer(Buffer* buffer, uint32_t offset, uint32_t val)
+    void GraphicsCommandList::MarkBuffer(Weak<Buffer> buffer, uint32_t offset, uint32_t val)
     {
         vkCmdFillBuffer((VkCommandBuffer)ID, (VkBuffer)buffer->ID, offset, sizeof(uint32_t), val);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::MarkBuffer(DebugBuffer* buffer, uint32_t val)
+    void GraphicsCommandList::MarkBuffer(Weak<DebugBuffer> buffer, uint32_t val)
     {
         VkAfterCrash_CmdWriteMarker((VkCommandBuffer)ID, (VkAfterCrash_Buffer)buffer->ID, 0, val);
-        return 0;
     }
-    RESULT GraphicsCommandList::DrawIndexed(uint32_t IndexCount, uint32_t InstanceCount, uint32_t startIndexLocation, uint32_t startVertexLocation, uint32_t startInstanceLocation)
+    void GraphicsCommandList::DrawIndexed(uint32_t IndexCount, uint32_t InstanceCount, uint32_t startIndexLocation, uint32_t startVertexLocation, uint32_t startInstanceLocation)
     {
         vkCmdDrawIndexed((VkCommandBuffer)ID, IndexCount, InstanceCount, startIndexLocation, startVertexLocation, startInstanceLocation);
-        return 0;
     }
-    RESULT GraphicsCommandList::CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Buffer* srcBuffer, Buffer* dstBuffer)
+    void GraphicsCommandList::CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Weak<Buffer> srcBuffer, Weak<Buffer> dstBuffer)
     {
         VkBufferCopy copy{};
         copy.size = size;
         copy.srcOffset = srcOffset;
         copy.dstOffset = dstOffset;
         vkCmdCopyBuffer((VkCommandBuffer)ID, (VkBuffer)srcBuffer->ID, (VkBuffer)dstBuffer->ID, 1, &copy);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Buffer* buffer, Texture* texture)
+    void GraphicsCommandList::CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture)
     {
         VkBufferImageCopy copy{};
         copy.bufferImageHeight = 0;
@@ -285,10 +267,9 @@ namespace RHI
         copy.imageSubresource.layerCount = dstRange.NumArraySlices;
         copy.imageSubresource.mipLevel = dstRange.IndexOrFirstMipLevel;
         vkCmdCopyBufferToImage((VkCommandBuffer)ID, (VkBuffer)buffer->ID, (VkImage)texture->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-        return RESULT();
     }
 
-    RESULT GraphicsCommandList::CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent, Texture* src, Texture* dst)
+    void GraphicsCommandList::CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent, Weak<Texture> src, Weak<Texture> dst)
     {
         VkImageCopy copy{};
         copy.dstOffset = { dstOffset.width, dstOffset.height,dstOffset.depth };
@@ -303,24 +284,22 @@ namespace RHI
         copy.dstSubresource.layerCount = dstRange.NumArraySlices;
         copy.dstSubresource.mipLevel = dstRange.IndexOrFirstMipLevel;
         vkCmdCopyImage((VkCommandBuffer)ID, (VkImage)src->ID, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, (VkImage)dst->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-        return RESULT();
-        
     }
 
-    RESULT GraphicsCommandList::ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
+    void GraphicsCommandList::ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
     {
         VkBufferMemoryBarrier BufferBarr[10]{};
         VkImageMemoryBarrier ImageBarr[100]{};
         int bn = 0, tn = 0;
         for (uint32_t i = 0; i < numBufferBarriers; i++)
         {
-            if (QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].nextQueue))
+            if (QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].nextQueue))
                 continue;
             BufferBarr[bn].buffer = (VkBuffer)pbufferBarriers[i].buffer->ID;
             BufferBarr[bn].srcAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsBefore;
             BufferBarr[bn].dstAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsAfter;
-            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].previousQueue);
-            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pbufferBarriers[i].nextQueue);
+            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].previousQueue);
+            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].nextQueue);
             BufferBarr[bn].offset = pbufferBarriers[i].offset;
             BufferBarr[bn].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
             BufferBarr[bn].size = pbufferBarriers[i].size;
@@ -328,7 +307,7 @@ namespace RHI
         }
         for (uint32_t i = 0; i < numImageBarriers; i++)
         {
-            if(QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue))
+            if(QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue))
                 continue;
             ImageBarr[tn].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             ImageBarr[tn].image = (VkImage)pImageBarriers[i].texture->ID;
@@ -336,8 +315,8 @@ namespace RHI
             ImageBarr[tn].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
             ImageBarr[tn].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
             ImageBarr[tn].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].previousQueue);
-            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as<vDevice>(), pImageBarriers[i].nextQueue);
+            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue);
+            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue);
             VkImageSubresourceRange range;
             range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
             range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
@@ -349,28 +328,24 @@ namespace RHI
         }
         if(bn+tn)
             vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, numBufferBarriers, BufferBarr, numImageBarriers, ImageBarr);
-        return RESULT();
     }
 
-    RESULT GraphicsCommandList::SetComputePipeline(ComputePipeline* cp)
+    void GraphicsCommandList::SetComputePipeline(Weak<ComputePipeline> cp)
     {
         vkCmdBindPipeline((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipeline)cp->ID);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BindComputeDescriptorSet(DescriptorSet* set, std::uint32_t setIndex)
+    void GraphicsCommandList::BindComputeDescriptorSet(Weak<DescriptorSet> set, std::uint32_t setIndex)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
+        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 0, 0);
-        return RESULT();
     }
-    RESULT GraphicsCommandList::BindComputeDynamicDescriptor(const DynamicDescriptor* set, std::uint32_t setIndex, std::uint32_t offset)
+    void GraphicsCommandList::BindComputeDynamicDescriptor(Weak<DynamicDescriptor> set, std::uint32_t setIndex, std::uint32_t offset)
     {
         VkDescriptorSet sets;
         sets = (VkDescriptorSet)set->ID;
-        RootSignature* rs = ((vGraphicsCommandList*)this)->currentRS.Get();
+        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
         vkCmdBindDescriptorSets((VkCommandBuffer)ID, VK_PIPELINE_BIND_POINT_COMPUTE, (VkPipelineLayout)rs->ID, setIndex, 1, &sets, 1, &offset);
-        return 0;
     }
 }

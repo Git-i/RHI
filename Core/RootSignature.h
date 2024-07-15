@@ -1,6 +1,6 @@
 #pragma once
 #include "Object.h"
-
+#include "FormatsAndTypes.h"
 namespace RHI
 {
 	class RHI_API RootSignature : public Object

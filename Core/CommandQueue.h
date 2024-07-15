@@ -3,6 +3,7 @@
 #include "Object.h"
 #include "FormatsAndTypes.h"
 #include "Fence.h"
+#include "Ptr.h"
 namespace RHI
 {
 	class RHI_API CommandQueue : public Object
@@ -11,8 +12,8 @@ namespace RHI
 		DECL_CLASS_CONSTRUCTORS(CommandQueue);
 	public:
 		static CommandQueue* FromNativeHandle(Internal_ID id);
-		RESULT WaitForFence(Fence*, std::uint64_t val);
-		RESULT SignalFence(Fence* fence, std::uint64_t val);
+		RESULT WaitForFence(Weak<Fence>, std::uint64_t val);
+		RESULT SignalFence(Weak<Fence> fence, std::uint64_t val);
 		RESULT ExecuteCommandLists(const Internal_ID* lists, std::uint32_t count);
 
 	};

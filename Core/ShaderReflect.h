@@ -1,5 +1,6 @@
 #pragma once
 #include "Object.h"
+#include "FormatsAndTypes.h"
 #include <string>
 namespace RHI
 {

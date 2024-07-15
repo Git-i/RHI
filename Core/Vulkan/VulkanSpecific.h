@@ -24,8 +24,8 @@
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
-    
-    
+
+
     CreationError marshall_error(VkResult r);
     std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface = RHI::Surface());
 
@@ -80,7 +80,7 @@ namespace RHI
             return VK_OBJECT_TYPE_BUFFER;
         }
     };
-    
+
     class vCommandAllocator final: public CommandAllocator
     {
     public:
@@ -100,7 +100,7 @@ namespace RHI
         }
         std::vector<Internal_ID> m_pools;
     };
-    
+
     class vTextureView : public TextureView
     {
         public:
@@ -113,7 +113,7 @@ namespace RHI
     {
     public:
         uint32_t* data;
-        
+
     };
     class vCommandQueue : public CommandQueue
     {
@@ -122,7 +122,7 @@ namespace RHI
             return VK_OBJECT_TYPE_QUEUE;
         }
     };
-    
+
     class vDescriptorHeap : public DescriptorHeap
     {
     public:
@@ -217,8 +217,9 @@ namespace RHI
         {
             return VK_OBJECT_TYPE_COMMAND_BUFFER;
         }
+        //state maintenance
         Ptr<vCommandAllocator> allocator;
-        Ptr<vRootSignature> currentRS = nullptr;
+        Weak<vRootSignature> currentRS = Weak<vRootSignature>::Null();
     };
     class vPipelineStateObject : public PipelineStateObject
     {
@@ -248,6 +249,9 @@ namespace RHI
     };
     class vDescriptorSet : public DescriptorSet
     {
+    public:
+        Ptr<vDescriptorSetLayout> layout;
+        Ptr<vDescriptorHeap> heap;
     };
     class vTexture : public Texture, public vResource
     {

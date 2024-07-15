@@ -1,6 +1,8 @@
 #pragma once
 #include "Core.h"
 #include "Ptr.h"
+#include "result.hpp"
+#include <vector>
 
 namespace RHI
 {
@@ -157,7 +159,7 @@ namespace RHI
 	};
 	struct ShaderCode
 	{
-		char* data = nullptr;
+		const char* data = nullptr;
 		uint32_t size = 0;
 	};
 	enum class API
@@ -377,6 +379,8 @@ namespace RHI
 	};
 	template<typename T>
 	using creation_result = ezr::result<Ptr<T>, CreationError>;
+	template<typename  T>
+	using creation_array_result = ezr::result<std::vector<Ptr<T>>, CreationError>;
 	//Structs for tag dispatch
 	typedef union { void* ptr; std::uintptr_t val; } CPU_HANDLE;
 	typedef struct {} Default_t;
@@ -384,5 +388,5 @@ namespace RHI
 	extern RHI_API Default_t Default;
 	extern RHI_API Zero_t Zero;
 
-	
+
 }
