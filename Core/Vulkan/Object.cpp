@@ -33,6 +33,6 @@ namespace RHI {
 		name_info.pObjectName = name;
 		name_info.objectHandle = (uint64_t)ID;
 		name_info.objectType = (VkObjectType)GetType();
-		vkSetDebugUtilsObjectNameEXT( (VkDevice)(device.retrieve_as<Device>())->ID, &name_info);
+		vkSetDebugUtilsObjectNameEXT( (VkDevice)(device.retrieve_as_forced<Device>())->ID, &name_info);
 	}
 }

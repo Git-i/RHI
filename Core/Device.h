@@ -40,7 +40,7 @@ namespace RHI
 		DECL_CLASS_CONSTRUCTORS(Device);
 	public:
 		creation_result<CommandAllocator> CreateCommandAllocator(CommandListType type);
-		creation_result<GraphicsCommandList> CreateCommandList(CommandListType type,CommandAllocator* allocator);
+		creation_result<GraphicsCommandList> CreateCommandList(CommandListType type,Ptr<CommandAllocator> allocator);
 		creation_result<DescriptorHeap> CreateDescriptorHeap(const DescriptorHeapDesc& desc);
 		creation_result<DynamicDescriptor> CreateDynamicDescriptor(Ptr<DescriptorHeap> heap, DescriptorType type, ShaderStage stage, Weak<Buffer> buffer,uint32_t offset, uint32_t size);
 		creation_result<TextureView> CreateTextureView(const TextureViewDesc& desc);
@@ -60,12 +60,12 @@ namespace RHI
 		creation_result<Fence> CreateFence(std::uint64_t val);
 		creation_result<DebugBuffer> CreateDebugBuffer();
 		std::uint32_t GetDescriptorHeapIncrementSize(DescriptorType type);
-		creation_result<Texture> GetSwapChainImage(SwapChain* swapchain, std::uint32_t index);
+		creation_result<Texture> GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index);
 		RESULT GetMemorySharingCapabilites();
 		RESULT ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle);
 		//This is not staying
-		RESULT QueueWaitIdle(CommandQueue* queue);
-		static RHI::Device* FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance,QueueFamilyIndices indices);
+		RESULT QueueWaitIdle(Weak<CommandQueue> queue);
+		static creation_result<Device> FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance,QueueFamilyIndices indices);
 		RHI::Texture* WrapNativeTexture(Internal_ID id);
 		~Device(){}
 		static ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>

@@ -42,7 +42,7 @@ namespace RHI
 	RESULT SwapChain::AcquireImage(std::uint32_t* imgIndex, uint32_t cycle)
 	{
 		auto vchain = ((vSwapChain*)this);
-		VkResult res = vkAcquireNextImageKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSwapchainKHR)ID, UINT64_MAX, vchain->present_semaphore[cycle], VK_NULL_HANDLE, imgIndex);
+		VkResult res = vkAcquireNextImageKHR((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSwapchainKHR)ID, UINT64_MAX, vchain->present_semaphore[cycle], VK_NULL_HANDLE, imgIndex);
 		if(res != VK_SUCCESS) DEBUG_BREAK;
 		return 0;
 	}

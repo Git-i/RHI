@@ -19,6 +19,6 @@ namespace RHI
 		waitInfo.pSemaphores = (VkSemaphore*)&ID;
 		waitInfo.pValues = &waitValue;
 		
-		vkWaitSemaphoresKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, &waitInfo, UINT64_MAX);
+		vkWaitSemaphoresKHR((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, &waitInfo, UINT64_MAX);
 	}
 }

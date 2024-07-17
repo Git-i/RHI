@@ -11,7 +11,7 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(CommandQueue);
 	public:
-		static CommandQueue* FromNativeHandle(Internal_ID id);
+		static Ptr<CommandQueue> FromNativeHandle(Internal_ID id);
 		RESULT WaitForFence(Weak<Fence>, std::uint64_t val);
 		RESULT SignalFence(Weak<Fence> fence, std::uint64_t val);
 		RESULT ExecuteCommandLists(const Internal_ID* lists, std::uint32_t count);

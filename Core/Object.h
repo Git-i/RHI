@@ -10,7 +10,7 @@ namespace RHI
 	protected:
 		std::atomic<uint32_t>* refCnt;
 		Object() { refCnt = new std::atomic<uint32_t>(); *refCnt = 1; }
-		virtual int32_t GetType() {return 0;} 
+		virtual int32_t GetType() {return 0;}
 	public:
 		void SetName(const char* name);
 		int Hold();

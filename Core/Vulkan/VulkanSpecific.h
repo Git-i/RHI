@@ -69,11 +69,11 @@ namespace RHI
         virtual ~vBuffer() override
         {
             delete Object::refCnt;
-            if(vma_ID) vmaDestroyBuffer(device.retrieve_as<vDevice>()->allocator, (VkBuffer)ID, vma_ID);
-            else vkDestroyBuffer( (VkDevice)(device.retrieve_as<vDevice>())->ID, (VkBuffer)ID, nullptr);
+            if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, (VkBuffer)ID, vma_ID);
+            else vkDestroyBuffer( (VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkBuffer)ID, nullptr);
             vma_ID = nullptr; ID = nullptr;
-            if(heap.Get()) heap->Release();
-            (device.retrieve_as<vDevice>())->Release();
+            if(heap.retrieve().IsValid()) heap->Release();
+            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -89,10 +89,10 @@ namespace RHI
             delete Object::refCnt;
             if (((vCommandAllocator*)this)->m_pools.size())
             {
-                vkFreeCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
+                vkFreeCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
             }
-            vkDestroyCommandPool((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
-            (device.retrieve_as<vDevice>())->Release();
+            vkDestroyCommandPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
+            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -129,8 +129,8 @@ namespace RHI
         virtual ~vDescriptorHeap() override
         {
             delete Object::refCnt;
-            vkDestroyDescriptorPool((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
-            (device.retrieve_as<vDevice>())->Release();
+            vkDestroyDescriptorPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
+            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -142,7 +142,7 @@ namespace RHI
     public:
     ~vDynamicDescriptor() override
     {
-        if(layout) vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, layout, nullptr);
+        if(layout) vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, layout, nullptr);
     };
     VkDescriptorSetLayout layout = nullptr;
     Ptr<vDescriptorHeap> heap = nullptr;
@@ -153,7 +153,7 @@ namespace RHI
         virtual ~vFence() override
         {
             delete Object::refCnt;
-            vkDestroySemaphore((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSemaphore)Fence::ID, nullptr);
+            vkDestroySemaphore((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSemaphore)Fence::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -166,7 +166,7 @@ namespace RHI
         virtual ~vHeap() override
         {
             delete Object::refCnt;
-            vkFreeMemory((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDeviceMemory)Heap::ID, nullptr);
+            vkFreeMemory((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDeviceMemory)Heap::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -179,7 +179,7 @@ namespace RHI
         virtual ~vDescriptorSetLayout() override
         {
             delete Object::refCnt;
-            vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
+            vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -192,7 +192,7 @@ namespace RHI
         virtual ~vRootSignature() override
         {
             delete Object::refCnt;
-            vkDestroyPipelineLayout((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
+            vkDestroyPipelineLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
 
         }
         virtual int32_t GetType() override
@@ -210,8 +210,7 @@ namespace RHI
             {
                 allocator->m_pools.erase(pos);
             }
-            vkFreeCommandBuffers((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
-            (device.retrieve_as<vDevice>())->Release();
+            vkFreeCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
         }
         virtual int32_t GetType() override
         {
@@ -219,7 +218,7 @@ namespace RHI
         }
         //state maintenance
         Ptr<vCommandAllocator> allocator;
-        Weak<vRootSignature> currentRS = Weak<vRootSignature>::Null();
+        Weak<vRootSignature> currentRS = nullptr;
     };
     class vPipelineStateObject : public PipelineStateObject
     {
@@ -227,7 +226,7 @@ namespace RHI
         virtual ~vPipelineStateObject() override
         {
             delete Object::refCnt;
-            vkDestroyPipeline((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
+            vkDestroyPipeline((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -240,7 +239,7 @@ namespace RHI
         virtual ~vComputePipeline() override
         {
             delete Object::refCnt;
-            vkDestroyPipeline((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkPipeline)ComputePipeline::ID, nullptr);
+            vkDestroyPipeline((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipeline)ComputePipeline::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -259,8 +258,8 @@ namespace RHI
         virtual ~vTexture() override
         {
             delete Object::refCnt;
-            if(vma_ID) vmaDestroyImage((device.retrieve_as<vDevice>())->allocator, (VkImage)ID, vma_ID);
-            else vkDestroyImage((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkImage)Texture::ID, nullptr);
+            if(vma_ID) vmaDestroyImage((device.retrieve_as_forced<vDevice>())->allocator, (VkImage)ID, vma_ID);
+            else vkDestroyImage((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkImage)Texture::ID, nullptr);
         }
         virtual int32_t GetType() override
         {
@@ -290,7 +289,7 @@ namespace RHI
         virtual ~vSwapChain() override
         {
             delete Object::refCnt;
-            vkDestroySwapchainKHR((VkDevice)(device.retrieve_as<vDevice>())->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
+            vkDestroySwapchainKHR((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
         }
         virtual int32_t GetType() override
         {

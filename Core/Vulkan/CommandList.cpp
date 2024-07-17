@@ -1,3 +1,4 @@
+#include "CommandAllocator.h"
 #include "FormatsAndTypes.h"
 #include "pch.h"
 #include "../CommandList.h"
@@ -39,7 +40,7 @@ namespace RHI
         //vkResetCommandBuffer((VkCommandBuffer)ID, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
         vkAllocateCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, &Info, (VkCommandBuffer*)&ID);
         if(name) SetName(name);
-        ((vGraphicsCommandList*)this)->allocator = allocator;
+        ((vGraphicsCommandList*)this)->allocator = allocator.transform<vCommandAllocator>();
         allocator.retrieve_as_forced<vCommandAllocator>()->m_pools.push_back(ID);
         return vkBeginCommandBuffer((VkCommandBuffer)ID, &bufferBeginInfo);
     }

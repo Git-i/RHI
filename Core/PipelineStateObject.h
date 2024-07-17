@@ -177,7 +177,7 @@ namespace RHI
 		std::uint32_t numRenderTargets;
 		InputElementDesc* inputElements;
 		InputBindingDesc* inputBindings;
-		RootSignature* rootSig;
+		Weak<RootSignature> rootSig;
 		
 
 		DepthStencilMode depthStencilMode;
@@ -190,6 +190,6 @@ namespace RHI
 	{
 		ShaderCode CS;
 		ShaderMode mode;
-		RootSignature* rootSig;
+		Weak<RootSignature> rootSig;
 	};
 }

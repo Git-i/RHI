@@ -45,10 +45,10 @@ namespace RHI
 		submitInfo.pWaitSemaphores = (VkSemaphore*)&fence->ID;
 		return vkQueueSubmit((VkQueue)ID, 1, &submitInfo, VK_NULL_HANDLE);
 	}
-	CommandQueue* CommandQueue::FromNativeHandle(Internal_ID id)
+	Ptr<CommandQueue> CommandQueue::FromNativeHandle(Internal_ID id)
 	{
-		RHI::vCommandQueue* vQueue = new RHI::vCommandQueue;
+		Ptr<vCommandQueue> vQueue(new RHI::vCommandQueue);
 		vQueue->ID = id;
-		return vQueue;
+		return vQueue.transform<CommandQueue>();
 	}
 }

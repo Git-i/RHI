@@ -55,7 +55,7 @@ namespace RHI
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         if(MQ)*MQ = true;
         VkPhysicalDeviceMemoryProperties memProps;
-        Ptr<vDevice> vdevice = new RHI::vDevice;
+        Ptr<vDevice> vdevice(new RHI::vDevice);
         std::unique_ptr<vCommandQueue[]> vqueue = std::make_unique<vCommandQueue[]>(numCommandQueues);
         std::vector<Ptr<CommandQueue>> queues;
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
@@ -190,11 +190,11 @@ namespace RHI
         VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
         return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), queues});
     }
-    RHI::Device* Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
+    creation_result<Device> Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
     {
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)phys_device;
         VkPhysicalDeviceMemoryProperties memProps;
-        vDevice* vdevice = new RHI::vDevice;
+        Ptr<vDevice> vdevice(new RHI::vDevice);
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
         for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
@@ -220,14 +220,16 @@ namespace RHI
         vmaInfo.pVulkanFunctions = nullptr;
         vmaInfo.pTypeExternalMemoryHandleTypes = 0;
 
-        vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
+        VkResult res = vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
+        if(res < 0) return ezr::err(marshall_error(res));
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
         acInfo.vkDevice = (VkDevice)vdevice->ID;
         acInfo.vkPhysicalDevice = vkPhysicalDevice;
-        VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
+        res = VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
+        if(res < 0) return ezr::err(marshall_error(res));
         vdevice->Hold();//the device doesnt belong to us, so we keep it alive for the external user
-        return vdevice;
+        return ezr::ok(vdevice.transform<Device>());
     }
     Default_t Default = {};
     Zero_t Zero = {};
@@ -308,7 +310,7 @@ namespace RHI
         return vkGetMemoryFdKHR((VkDevice)ID,&info,handle);
 
     }
-    RESULT Device::QueueWaitIdle(CommandQueue* queue)
+    RESULT Device::QueueWaitIdle(Weak<CommandQueue> queue)
     {
         return vkQueueWaitIdle((VkQueue)queue->ID);
     }
@@ -360,7 +362,7 @@ namespace RHI
         if(res < 0) return creation_result<CommandAllocator>::err(marshall_error(res));
         return creation_result<CommandAllocator>::ok(vallocator.release());
     }
-    creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, CommandAllocator* allocator)
+    creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, Ptr<CommandAllocator> allocator)
     {
         std::unique_ptr<vGraphicsCommandList> vCommandlist = std::make_unique<vGraphicsCommandList>();
         VkCommandBufferAllocateInfo Info = {};
@@ -372,14 +374,14 @@ namespace RHI
         VkResult res = vkAllocateCommandBuffers((VkDevice)ID, &Info, &commandBuffer);
         vCommandlist->ID = commandBuffer;
         vCommandlist->device = make_ptr(this);
-        vCommandlist->allocator = make_ptr((vCommandAllocator*)allocator);
+        vCommandlist->allocator = allocator.transform<vCommandAllocator>();
 
         if(res < 0)
         {
             return creation_result<GraphicsCommandList>::err(marshall_error(res));
         }
 
-        ((vCommandAllocator*)allocator)->m_pools.push_back(vCommandlist->ID);
+        allocator.retrieve_as_forced<vCommandAllocator>()->m_pools.push_back(vCommandlist->ID);
 
         return creation_result<GraphicsCommandList>::ok(vCommandlist);
     }
@@ -486,17 +488,17 @@ namespace RHI
             return sizeof(VkSampler);
         return 0;
     }
-    creation_result<Texture> Device::GetSwapChainImage(SwapChain* swapchain, std::uint32_t index)
+    creation_result<Texture> Device::GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index)
     {
-        std::unique_ptr<vTexture> vtexture = std::make_unique<vTexture>();
+        Ptr<vTexture> vtexture(new vTexture);
         std::uint32_t img = index + 1;
         std::vector<VkImage> images(img);
         VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
-        (vtexture)->ID = images[index];
+        vtexture->ID = images[index];
         vtexture->Hold();//the image is externally owned
         vtexture->device = make_ptr(this);
         if(res < 0) return creation_result<Texture>::err(marshall_error(res));
-        return creation_result<Texture>::ok(vtexture.release());
+        return ezr::ok(vtexture.transform<Texture>());
     }
     creation_result<Fence> Device::CreateFence( std::uint64_t val)
     {
@@ -1060,10 +1062,10 @@ namespace RHI
         {
             vSets[i].ID = descriptorSets[i];
             vSets[i].device = make_ptr(this);
-            vSets[i].heap = heap;
-            vSets[i].layout = layouts[i];
+            vSets[i].heap = heap.transform<vDescriptorHeap>();
+            vSets[i].layout = layouts[i].transform<vDescriptorSetLayout>();
             auto array = vSets.release();
-            returnValues.push_back(&array[i]);
+            returnValues.push_back(Ptr<DescriptorSet>(&array[i]));
         }
         return creation_array_result<DescriptorSet>::ok(returnValues);
     }
@@ -1215,7 +1217,7 @@ namespace RHI
         if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
 
         vdescriptor->device = make_ptr(this);
-        vdescriptor->heap = heap;
+        vdescriptor->heap = heap.transform<vDescriptorHeap>();
         VkDescriptorBufferInfo binfo{};
         binfo.buffer = (VkBuffer)buffer->ID;
         binfo.offset = offset;

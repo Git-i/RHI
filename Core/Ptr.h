@@ -19,12 +19,16 @@ namespace RHI
             ptr = other.ptr;
             SafeHold();
         }
-        Ptr(T* other) noexcept
+        Ptr(std::nullptr_t other) noexcept
         {
             ptr = other;
         }
-        template<typename U>
-        Ptr(Ptr<U>&& other, typename std::enable_if_t<std::is_convertible_v<T*, U*>>) noexcept
+        explicit Ptr(T* other) noexcept
+        {
+            ptr = other;
+        }
+        template<typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>>>
+        Ptr(Ptr<U>&& other) noexcept
         {
             ptr = other.ptr;
             other.ptr = nullptr;
@@ -42,9 +46,9 @@ namespace RHI
         template<typename U>
         [[nodiscard]] Weak<U> retrieve_as_forced()
         {
-            return Weak<U>{ptr};
+            return Weak<U>{(U*)ptr};
         }
-        template<typename U, typename std::enable_if_t<std::is_convertible_v<T*, U*>>>
+        template<typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>>>
         [[nodiscard]] Weak<U> retrieve_as()
         {
             return Weak<U>{ptr};
@@ -53,17 +57,17 @@ namespace RHI
         template<typename U>
         Ptr<U> transform()
         {
-            return make_ptr((U*)ptr);
+            return Ptr<U>((U*)ptr);
         }
 
-        template<typename U>
+        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
         void operator=(const Ptr<U>& other)
         {
             SafeRelease();
             ptr = other.ptr;
             SafeHold();
         }
-        template<typename U>
+        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
         void operator=(Ptr<U>&& other)
         {
             SafeRelease();
@@ -80,10 +84,13 @@ namespace RHI
         {
             return ptr;
         }
-
-        T** operator&()
+        bool IsValid()
         {
-            return &ptr;
+            return ptr != nullptr && ptr->GetRefCount();
+        }
+        bool NotValid()
+        {
+            return !IsValid();
         }
     private:
         template<typename U> friend class Ptr;
@@ -118,17 +125,23 @@ namespace RHI
     template<typename T>
     class Weak
     {
+    private:
         T* ptr;
+        Weak(T* val)
+        {
+            ptr = val;
+        }
     public:
         template<typename U> friend class Ptr;
+        template<typename U> friend class Weak;
         Weak(const Ptr<T>& ptr)
         {
             this->ptr = ptr.Get();
         }
         Weak() = default;
-        static Weak Null()
+        Weak(std::nullptr_t)
         {
-            return Weak{nullptr};
+            ptr = nullptr;
         }
         T* operator->() const
         {
@@ -147,6 +160,14 @@ namespace RHI
         void operator=(const Ptr<T>& ptr)
         {
             this->ptr = ptr.Get();
+        }
+        bool IsValid()
+        {
+            return ptr != nullptr && ptr->GetRefCount();
+        }
+        bool NotValid()
+        {
+            return !IsValid();
         }
     };
 }

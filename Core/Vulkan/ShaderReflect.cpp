@@ -5,9 +5,9 @@
 #include "volk.h"
 namespace RHI
 {
-	RESULT ShaderReflection::CreateFromFile(const char* filename,ShaderReflection** pReflection)
+	creation_result<ShaderReflection> ShaderReflection::CreateFromFile(const char* filename)
 	{
-		vShaderReflection* vReflection = new vShaderReflection;
+		Ptr<vShaderReflection> vReflection(new vShaderReflection);
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
 		char actual_name[1024];
@@ -20,17 +20,17 @@ namespace RHI
 		file.read(buffer.data(), fileSize);
 		file.close();
 		SpvReflectResult result = spvReflectCreateShaderModule(buffer.size(), buffer.data(), module);
-		*pReflection = vReflection;
-		return result;
+		//TODO
+		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
-	RESULT ShaderReflection::CreateFromMemory(const char* buffer, uint32_t size,ShaderReflection** pReflection)
+	creation_result<ShaderReflection> ShaderReflection::CreateFromMemory(const char* buffer, uint32_t size)
 	{
-		vShaderReflection* vReflection = new vShaderReflection;
+		Ptr<vShaderReflection> vReflection(new vShaderReflection);
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
 		SpvReflectResult result = spvReflectCreateShaderModule(size, buffer, module);
-		*pReflection = vReflection;
-		return result;
+		
+		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
 	uint32_t ShaderReflection::GetNumDescriptorSets()
 	{

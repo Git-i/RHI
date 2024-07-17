@@ -23,8 +23,8 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(ShaderReflection)
 	public:
-		static RESULT CreateFromFile(const char* filename, ShaderReflection** reflection);
-		static RESULT CreateFromMemory(const char* buffer,uint32_t size, ShaderReflection** reflection);
+		static creation_result<ShaderReflection> CreateFromFile(const char* filename);
+		static creation_result<ShaderReflection> CreateFromMemory(const char* buffer,uint32_t size);
 		uint32_t GetNumDescriptorSets();
 		void GetAllDescriptorSets(SRDescriptorSet* set);
 		void GetDescriptorSet(uint32_t set_index, SRDescriptorSet* set);

@@ -381,6 +381,8 @@ namespace RHI
 	using creation_result = ezr::result<Ptr<T>, CreationError>;
 	template<typename  T>
 	using creation_array_result = ezr::result<std::vector<Ptr<T>>, CreationError>;
+	template<typename  T>
+	using creation_weak_result = ezr::result<Weak<T>, CreationError>;
 	//Structs for tag dispatch
 	typedef union { void* ptr; std::uintptr_t val; } CPU_HANDLE;
 	typedef struct {} Default_t;
