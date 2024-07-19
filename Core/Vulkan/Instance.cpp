@@ -99,7 +99,7 @@ namespace RHI
 		volkLoadInstance((VkInstance)inst->ID);
 		return inst;
 	}
-	RESULT Instance::GetPhysicalDevice(int id, PhysicalDevice** device)
+	RESULT Instance::GetPhysicalDevice(uint32_t id, PhysicalDevice** device)
 	{
 		vPhysicalDevice* vdevice = new vPhysicalDevice;
 		std::vector<VkPhysicalDevice> devices;
@@ -127,26 +127,26 @@ namespace RHI
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR((VkPhysicalDevice)pDev->ID,(VkSurfaceKHR)surface->ID,&caps);
 		return {caps.minImageCount, caps.maxImageCount};
 	}
-	creation_result<SwapChain> Instance::CreateSwapChain(SwapChainDesc* desc, PhysicalDevice* pDevice, Device* Device, CommandQueue* pCommandQueue)
+	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* pDevice, Weak<Device> Device, Weak<CommandQueue> pCommandQueue)
 	{
-		vSwapChain* vswapChain = new vSwapChain;
+		Ptr<vSwapChain> vswapChain(new vSwapChain);
 		VkSwapchainCreateInfoKHR createInfo{};
 		std::uint32_t count;
-		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, nullptr);
+		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface.ID, &count, nullptr);
 		std::vector<VkSurfaceFormatKHR> format(count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc->OutputSurface.ID, &count, format.data());
+		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface.ID, &count, format.data());
 
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = (VkSurfaceKHR)desc->OutputSurface.ID;
+		createInfo.surface = (VkSurfaceKHR)desc.OutputSurface.ID;
 
-		createInfo.minImageCount = desc->BufferCount;
-		createInfo.imageFormat = FormatConv(desc->SwapChainFormat);
+		createInfo.minImageCount = desc.BufferCount;
+		createInfo.imageFormat = FormatConv(desc.SwapChainFormat);
 		createInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-		createInfo.imageExtent = { desc->Width, desc->Height };
+		createInfo.imageExtent = { desc.Width, desc.Height };
 		createInfo.imageArrayLayers = 1;
 		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-		auto [indices,_] = findQueueFamilyIndices(pDevice, desc->OutputSurface);
+		auto [indices,_] = findQueueFamilyIndices(pDevice, desc.OutputSurface);
 		uint32_t queueFamilyIndices[] = { indices.graphicsIndex, indices.presentIndex };
 
 		if (indices.graphicsIndex != indices.presentIndex) {
@@ -165,24 +165,17 @@ namespace RHI
 
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 		VkResult res = vkCreateSwapchainKHR((VkDevice)Device->ID, &createInfo, nullptr, (VkSwapchainKHR*)&vswapChain->ID);
-		if(res < 0)
-		{
-			delete vswapChain;
-			return creation_result<SwapChain>::err(marshall_error(res));
-		}
+		if(res < 0) return creation_result<SwapChain>::err(marshall_error(res));
 		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		vswapChain->present_semaphore.resize(desc->BufferCount);
-		for(uint32_t i = 0; i < desc->BufferCount; i++)
+		vswapChain->present_semaphore.resize(desc.BufferCount);
+		for(uint32_t i = 0; i < desc.BufferCount; i++)
 		{
 			res = vkCreateSemaphore((VkDevice)Device->ID, &semaphoreInfo, nullptr, &vswapChain->present_semaphore[i]);
-			if(res < 0)
-			{
-				delete vswapChain;
-				return creation_result<SwapChain>::err(marshall_error(res));
-			}
+			if(res < 0) return creation_result<SwapChain>::err(marshall_error(res));
 		}
-		vswapChain->device = make_ptr(Device);
+		vswapChain->device = make_ptr(Device.Raw());
+		Device->Release();
 		vkGetDeviceQueue((VkDevice)Device->ID, indices.presentIndex, 0, (VkQueue*)&vswapChain->PresentQueue_ID);
 		
 		return creation_result<SwapChain>::ok(vswapChain);

@@ -84,6 +84,10 @@ namespace RHI
         {
             return ptr;
         }
+        T* Raw() const
+        {
+            return ptr;
+        }
         bool IsValid()
         {
             return ptr != nullptr && ptr->GetRefCount();
@@ -160,6 +164,10 @@ namespace RHI
         void operator=(const Ptr<T>& ptr)
         {
             this->ptr = ptr.Get();
+        }
+        T* Raw() const
+        {
+            return ptr;
         }
         bool IsValid()
         {

@@ -345,7 +345,7 @@ namespace RHI
     }
     creation_result<CommandAllocator> Device::CreateCommandAllocator(CommandListType type)
     {
-        std::unique_ptr<vCommandAllocator> vallocator = std::make_unique<vCommandAllocator>();
+        Ptr<vCommandAllocator> vallocator(new vCommandAllocator);
         std::uint32_t index = 0;
         if (type == CommandListType::Direct) index = ((vDevice*)this)->indices.graphicsIndex;
         if (type == CommandListType::Compute) index = ((vDevice*)this)->indices.computeIndex;
@@ -360,7 +360,7 @@ namespace RHI
 
 
         if(res < 0) return creation_result<CommandAllocator>::err(marshall_error(res));
-        return creation_result<CommandAllocator>::ok(vallocator.release());
+        return creation_result<CommandAllocator>::ok(vallocator);
     }
     creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, Ptr<CommandAllocator> allocator)
     {
@@ -411,7 +411,7 @@ namespace RHI
     }
     creation_result<DescriptorHeap> Device::CreateDescriptorHeap(const DescriptorHeapDesc& desc)
     {
-        std::unique_ptr<vDescriptorHeap> vdescriptorHeap = std::make_unique<vDescriptorHeap>();
+        Ptr<vDescriptorHeap> vdescriptorHeap(new vDescriptorHeap);
         VkResult res = VK_SUCCESS;
         if (desc.poolSizes->type == DescriptorType::RTV || desc.poolSizes->type == DescriptorType::DSV)
         {
@@ -439,7 +439,7 @@ namespace RHI
             res = vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
         }
         if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
-        return creation_result<DescriptorHeap>::ok(vdescriptorHeap.release());
+        return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
     }
     CreationError Device::CreateRenderTargetView(Weak<Texture> texture, const RenderTargetViewDesc& desc, CPU_HANDLE heapHandle)
     {
@@ -502,7 +502,7 @@ namespace RHI
     }
     creation_result<Fence> Device::CreateFence( std::uint64_t val)
     {
-        std::unique_ptr<vFence> vfence = std::make_unique<vFence>();
+        Ptr<vFence> vfence(new vFence);
         VkSemaphoreTypeCreateInfo timelineCreateInfo;
         timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
         timelineCreateInfo.pNext = NULL;
@@ -520,11 +520,11 @@ namespace RHI
         vfence->device = make_ptr(this);
 
         if(res < 0) return creation_result<Fence>::err(marshall_error(res));
-        return creation_result<Fence>::ok(vfence.release());
+        return creation_result<Fence>::ok(vfence);
     }
     creation_result<Buffer> Device::CreateBuffer(const BufferDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
     {
-        std::unique_ptr<vBuffer> vbuffer = std::make_unique<vBuffer>();
+        Ptr<vBuffer> vbuffer(new vBuffer);
         VkBufferCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -565,7 +565,7 @@ namespace RHI
             if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
 
-        return creation_result<Buffer>::ok(vbuffer.release());
+        return creation_result<Buffer>::ok(vbuffer);
     }
     MemoryReqirements Device::GetBufferMemoryRequirements(const BufferDesc& desc)
     {
@@ -1346,13 +1346,9 @@ namespace RHI
         range.levelCount =                     desc.range.NumMipLevels;
         info.subresourceRange = range;
         info.viewType = VkViewType(desc.type);
-        vTextureView* vtview = new vTextureView;
+        Ptr<vTextureView> vtview(new vTextureView);
         VkResult res = vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)&vtview->ID);
-        if(res < 0)
-        {
-            delete vtview;
-            return creation_result<TextureView>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<TextureView>::err(marshall_error(res));
         return creation_result<TextureView>::ok(vtview);
     }
     VkSamplerAddressMode VkAddressMode(AddressMode mode)
@@ -1420,15 +1416,11 @@ namespace RHI
     }
     creation_result<DebugBuffer> Device::CreateDebugBuffer()
     {
-        vDebugBuffer* buff = new vDebugBuffer;
+        Ptr<vDebugBuffer> buff(new vDebugBuffer);
         VkAfterCrash_BufferCreateInfo info;
         info.markerCount = 1;
         VkResult res = VkAfterCrash_CreateBuffer(((vDevice*)this)->acDevice, &info, (VkAfterCrash_Buffer*)&buff->ID,&buff->data);
-        if(res < 0)
-        {
-            delete buff;
-            return creation_result<DebugBuffer>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<DebugBuffer>::err(marshall_error(res));
         return creation_result<DebugBuffer>::ok(buff);
     }
 

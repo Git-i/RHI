@@ -151,6 +151,18 @@ namespace RHI
 		V408 = 132,
 		SAMPLER_FEEDBACK_MIN_MIP_OPAQUE,
 		SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE,
+		FLOAT4 = R32G32B32A32_FLOAT,
+		FLOAT3 = R32G32B32_FLOAT,
+		FLOAT2 = R32G32_FLOAT,
+		FLOAT  = R32_FLOAT,
+		UINT4  = R32G32B32A32_UINT,
+		UINT3  = R32G32B32_UINT,
+		UINT2  = R32G32_UINT,
+		UINT   = R32_UINT,
+		INT4   = R32G32B32A32_SINT,
+		INT3   = R32G32B32_SINT,
+		INT2   = R32G32_SINT,
+		INT    = R32_SINT,
 	};
 	struct Rational
 	{
@@ -159,7 +171,10 @@ namespace RHI
 	};
 	struct ShaderCode
 	{
-		const char* data = nullptr;
+		union{
+			const char* data = nullptr;
+			char* mut_data;
+		};
 		uint32_t size = 0;
 	};
 	enum class API
