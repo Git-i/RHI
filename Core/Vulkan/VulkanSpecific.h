@@ -72,8 +72,6 @@ namespace RHI
             if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, (VkBuffer)ID, vma_ID);
             else vkDestroyBuffer( (VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkBuffer)ID, nullptr);
             vma_ID = nullptr; ID = nullptr;
-            if(heap.retrieve().IsValid()) heap->Release();
-            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -92,7 +90,6 @@ namespace RHI
                 vkFreeCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
             }
             vkDestroyCommandPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
-            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {
@@ -130,7 +127,6 @@ namespace RHI
         {
             delete Object::refCnt;
             vkDestroyDescriptorPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
-            (device.retrieve_as_forced<vDevice>())->Release();
         }
         virtual int32_t GetType() override
         {

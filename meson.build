@@ -64,4 +64,4 @@ if(build_machine.system() == 'windows')
     add_project_arguments('-DVK_USE_PLATFORM_WIN32_KHR',language: 'cpp')
 endif
 lib = library('RHI', vulkan_src, include_directories: inc, dependencies: deps)
-rhi_dep = declare_dependency(include_directories: inc, link_with: lib)
+rhi_dep = declare_dependency(include_directories: inc, link_with: lib, dependencies: deps)

@@ -56,8 +56,7 @@ namespace RHI
         if(MQ)*MQ = true;
         VkPhysicalDeviceMemoryProperties memProps;
         Ptr<vDevice> vdevice(new RHI::vDevice);
-        std::unique_ptr<vCommandQueue[]> vqueue = std::make_unique<vCommandQueue[]>(numCommandQueues);
-        std::vector<Ptr<CommandQueue>> queues;
+        std::vector<Ptr<CommandQueue>> vqueue;
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
         for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
@@ -153,17 +152,15 @@ namespace RHI
         {
             return ezr::err(marshall_error(res));
         }
-        vCommandQueue* queue_mem = vqueue.release();
+        vqueue.reserve(numCommandQueues);
         for (int i = 0; i < numCommandQueues; i++)
         {
-
+            vqueue.emplace_back(new vCommandQueue);
             uint32_t index = 0;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
-            vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&queue_mem[i].ID);
-            queue_mem[i].device = vdevice;
-            queues.emplace_back((CommandQueue*)queue_mem);
+            vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&vqueue[i]->ID);
         }
         //initialize VMA
         VkExternalMemoryHandleTypeFlagsKHR ext_mem[] = {
@@ -188,7 +185,7 @@ namespace RHI
         acInfo.vkDevice = (VkDevice)vdevice->ID;
         acInfo.vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
-        return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), queues});
+        return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), vqueue});
     }
     creation_result<Device> Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
     {
@@ -364,7 +361,7 @@ namespace RHI
     }
     creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, Ptr<CommandAllocator> allocator)
     {
-        std::unique_ptr<vGraphicsCommandList> vCommandlist = std::make_unique<vGraphicsCommandList>();
+        Ptr<vGraphicsCommandList> vCommandlist(new vGraphicsCommandList);
         VkCommandBufferAllocateInfo Info = {};
         Info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         Info.commandPool = (VkCommandPool)allocator->ID;
@@ -588,7 +585,7 @@ namespace RHI
     }
     creation_result<Heap> Device::CreateHeap(const HeapDesc& desc, bool* usedFallback)
     {
-        vHeap* vheap = new vHeap;
+        Ptr<vHeap> vheap(new vHeap);
         if(usedFallback)*usedFallback = false;
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -624,11 +621,7 @@ namespace RHI
         }
         allocInfo.memoryTypeIndex = MemIndex;
         VkResult res = vkAllocateMemory((VkDevice)ID, &allocInfo, nullptr, (VkDeviceMemory*)&vheap->ID);
-        if(res < 0)
-        {
-            delete vheap;
-            return creation_result<Heap>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<Heap>::err(marshall_error(res));
 
         return creation_result<Heap>::ok(vheap);
     }
@@ -664,7 +657,7 @@ namespace RHI
     creation_result<RootSignature> Device::CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts)
     {
         vDescriptorSetLayout* vSetLayouts = new vDescriptorSetLayout[desc->numRootParameters];
-        vRootSignature* vrootSignature = new vRootSignature;
+        Ptr<vRootSignature> vrootSignature(new vRootSignature);
         VkDescriptorSetLayout descriptorSetLayout[20];
         VkDescriptorSetLayoutCreateInfo layoutInfo[20]{};
 
@@ -698,7 +691,6 @@ namespace RHI
                         if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
                     }
                     delete[] vSetLayouts;
-                    delete vrootSignature;
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
                 numLayouts++;
@@ -733,7 +725,6 @@ namespace RHI
                         if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
                     }
                     delete[] vSetLayouts;
-                    delete vrootSignature;
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
                 pSetLayouts[numLayouts] = make_ptr(&vSetLayouts[numLayouts]);
@@ -761,7 +752,6 @@ namespace RHI
         if(res < 0)
         {
             delete[] vSetLayouts;
-            delete vrootSignature;
             return creation_result<RootSignature>::err(marshall_error(res));
         }
         vrootSignature->device = make_ptr(this);
@@ -840,7 +830,7 @@ namespace RHI
     }
     creation_result<PipelineStateObject> Device::CreatePipelineStateObject(const PipelineStateObjectDesc& desc)
     {
-        vPipelineStateObject* vPSO = new vPipelineStateObject;
+        Ptr<vPipelineStateObject> vPSO(new vPipelineStateObject);
         GFX_ASSERT(desc->numInputElements < 5);
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
@@ -1031,11 +1021,7 @@ namespace RHI
         vPSO->device = make_ptr(this);
 
         VkResult res = vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
-        if(res < 0)
-        {
-            delete vPSO;
-            return creation_result<PipelineStateObject>::err(marshall_error(res));
-        }
+        if(res < 0) return creation_result<PipelineStateObject>::err(marshall_error(res));
         for(int i = 0; i < index; i++)
             vkDestroyShaderModule((VkDevice)ID, modules[i], nullptr);
         return creation_result<PipelineStateObject>::ok(vPSO);
@@ -1184,7 +1170,7 @@ namespace RHI
     }
     creation_result<DynamicDescriptor> Device::CreateDynamicDescriptor(Ptr<DescriptorHeap> heap, DescriptorType type,ShaderStage stage, Weak<Buffer> buffer,uint32_t offset,uint32_t size)
     {
-        if(type != DescriptorType::ConstantBufferDynamic || type != DescriptorType::StructuredBufferDynamic || heap.ptr == nullptr)
+        if((type != DescriptorType::ConstantBufferDynamic && type != DescriptorType::StructuredBufferDynamic) || heap.ptr == nullptr)
         {
             return creation_result<DynamicDescriptor>::err(CreationError::InvalidParameters);
         }
@@ -1202,7 +1188,7 @@ namespace RHI
         info.flags = 0;
         info.pBindings = &binding;
 
-        std::unique_ptr<vDynamicDescriptor> vdescriptor = std::make_unique<vDynamicDescriptor>();
+        Ptr<vDynamicDescriptor> vdescriptor(new vDynamicDescriptor);
         res = vkCreateDescriptorSetLayout((VkDevice)ID, &info, nullptr, &vdescriptor->layout);
 
         if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
@@ -1233,7 +1219,7 @@ namespace RHI
     }
     creation_result<Texture> Device::CreateTexture(const TextureDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
     {
-        std::unique_ptr<vTexture> vtexture = std::make_unique<vTexture>();
+        Ptr<vTexture> vtexture(new vTexture);
         VkImageCreateInfo info{};
         info.arrayLayers = desc.type == TextureType::Texture3D ? 1 : desc.depthOrArraySize;
         info.extent.width = desc.width;
@@ -1400,7 +1386,7 @@ namespace RHI
     }
     creation_result<ComputePipeline> Device::CreateComputePipeline(const ComputePipelineDesc& desc)
     {
-        std::unique_ptr<vComputePipeline> vpipeline = std::make_unique<vComputePipeline>();
+        Ptr<vComputePipeline> vpipeline(new vComputePipeline);
         vpipeline->device = make_ptr(this);
         VkComputePipelineCreateInfo info{};
         info.layout = (VkPipelineLayout)desc.rootSig->ID;

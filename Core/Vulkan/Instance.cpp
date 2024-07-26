@@ -8,7 +8,6 @@
 #include "VulkanSpecific.h"
 #include <vector>
 #include <iostream>
-#include <numeric> //for itoa
 #include <array>
 #ifdef USE_GLFW
 #include <GLFW/glfw3.h>

@@ -9,9 +9,31 @@ namespace RHI
     class Ptr
     {
     public:
-        Ptr()
+        Ptr() noexcept
         {
             ptr = nullptr;
+        }
+        Ptr(const Ptr& other) noexcept
+        {
+            ptr = other.ptr;
+            SafeHold();
+        }
+        Ptr(Ptr&& other) noexcept
+        {
+            ptr = other.ptr;
+            other.ptr = nullptr;
+        }
+        void operator=(const Ptr& other)
+        {
+            SafeRelease();
+            ptr = other.ptr;
+            SafeHold();
+        }
+        void operator=(Ptr&& other)
+        {
+            SafeRelease();
+            ptr = other.ptr;
+            other.ptr = nullptr;
         }
         template<typename U, typename std::enable_if_t<std::is_convertible_v<U*, T*>>>
         Ptr(const Ptr<U>& other) noexcept
@@ -39,25 +61,27 @@ namespace RHI
             SafeRelease();
             ptr = nullptr;
         }
-        [[nodiscard]] Weak<T> retrieve()
+        [[nodiscard]] Weak<T> retrieve() const
         {
             return Weak<T>{ptr};
         }
         template<typename U>
-        [[nodiscard]] Weak<U> retrieve_as_forced()
+        [[nodiscard]] Weak<U> retrieve_as_forced() const
         {
             return Weak<U>{(U*)ptr};
         }
         template<typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>>>
-        [[nodiscard]] Weak<U> retrieve_as()
+        [[nodiscard]] Weak<U> retrieve_as() const
         {
             return Weak<U>{ptr};
         }
 
         template<typename U>
-        Ptr<U> transform()
+        Ptr<U> transform() const
         {
-            return Ptr<U>((U*)ptr);
+            auto val = Ptr<U>((U*)ptr);
+            val.SafeHold();
+            return val;
         }
 
         template<typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
@@ -80,6 +104,10 @@ namespace RHI
             SafeRelease();
             ptr = _ptr;
         }
+        bool operator==(const Ptr<T>& other) const
+        {
+            return ptr == other.ptr;
+        }
         T* operator->() const
         {
             return ptr;
@@ -88,11 +116,11 @@ namespace RHI
         {
             return ptr;
         }
-        bool IsValid()
+        bool IsValid() const
         {
             return ptr != nullptr && ptr->GetRefCount();
         }
-        bool NotValid()
+        bool NotValid() const
         {
             return !IsValid();
         }
