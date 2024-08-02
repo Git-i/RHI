@@ -1,6 +1,8 @@
 #pragma once
 #include "Object.h"
 #include "FormatsAndTypes.h"
+#include "RootSignature.h"
+#include <initializer_list>
 #include <string>
 namespace RHI
 {
@@ -25,6 +27,11 @@ namespace RHI
 	public:
 		static creation_result<ShaderReflection> CreateFromFile(const char* filename);
 		static creation_result<ShaderReflection> CreateFromMemory(const char* buffer,uint32_t size);
+		auto FillRootSignatureDesc(RHI::ShaderStage stage) -> std::tuple<
+			RootSignatureDesc,
+			std::vector<RootParameterDesc>,
+			std::vector<std::vector<DescriptorRange>>>;
+		RootSignatureDesc Concatenate(std::initializer_list<RootSignatureDesc> list);
 		uint32_t GetNumDescriptorSets();
 		void GetAllDescriptorSets(SRDescriptorSet* set);
 		void GetDescriptorSet(uint32_t set_index, SRDescriptorSet* set);

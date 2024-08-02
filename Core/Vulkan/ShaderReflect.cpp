@@ -1,7 +1,10 @@
+#include "RootSignature.h"
 #include "pch.h"
 #include "VulkanSpecific.h"
 #include "../ShaderReflect.h"
 #include <fstream>
+#include <vector>
+#include "spirv_reflect.h"
 #include "volk.h"
 namespace RHI
 {
@@ -114,5 +117,43 @@ namespace RHI
 			bindings[i].name = SPVset->bindings[i]->name;
 		}
 	}
+	auto ShaderReflection::FillRootSignatureDesc(RHI::ShaderStage stage) -> std::tuple<
+			RootSignatureDesc,
+			std::vector<RootParameterDesc>,
+			std::vector<std::vector<DescriptorRange>>>
+	{
+		RootSignatureDesc rsDesc;
+		std::vector<RootParameterDesc> rootParams;
+		std::vector<std::vector<DescriptorRange>> ranges_vec;
+		uint32_t numSets = GetNumDescriptorSets();
+		std::vector<RHI::SRDescriptorSet> sets(numSets);
+		GetAllDescriptorSets(sets.data());
+		
+		for (uint32_t i = 0; i < numSets; i++)
+		{
+			auto& ranges = ranges_vec.emplace_back(ranges_vec);
+			RHI::RootParameterDesc desc;
 
+			desc.type = RHI::RootParameterType::DescriptorTable;
+			desc.descriptorTable.setIndex = sets[i].setIndex;
+			desc.descriptorTable.numDescriptorRanges = sets[i].bindingCount;
+			std::vector<RHI::SRDescriptorBinding> bindings(sets[i].bindingCount);
+			GetDescriptorSetBindings(&sets[i], bindings.data());
+			//fill out all the ranges (descriptors)
+			for (uint32_t j = 0; j < sets[i].bindingCount; j++)
+			{
+				RHI::DescriptorRange range;
+				range.BaseShaderRegister = bindings[j].bindingSlot;
+				range.numDescriptors = bindings[j].count;
+				range.type = bindings[j].resourceType;
+				range.stage = stage;
+				ranges.push_back(range);
+			}
+			desc.descriptorTable.ranges = ranges.data();
+			rootParams.push_back(desc);
+		}
+		rsDesc.numRootParameters = rootParams.size();
+		rsDesc.rootParameters = rootParams.data();
+		return {rsDesc, std::move(rootParams), std::move(ranges_vec)};
+	}
 }
