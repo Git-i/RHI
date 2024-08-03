@@ -1,7 +1,9 @@
+#include "FormatsAndTypes.h"
 #include "RootSignature.h"
 #include "pch.h"
 #include "VulkanSpecific.h"
 #include "../ShaderReflect.h"
+#include <cstdint>
 #include <fstream>
 #include <vector>
 #include "spirv_reflect.h"
@@ -38,8 +40,25 @@ namespace RHI
 	uint32_t ShaderReflection::GetNumDescriptorSets()
 	{
 		uint32_t count;
-		spvReflectEnumerateDescriptorSets((SpvReflectShaderModule*)ID, &count, NULL);
+		spvReflectEnumerateDescriptorSets((SpvReflectShaderModule*)ID, &count, nullptr);
 		return count;
+	}
+	uint32_t ShaderReflection::GetNumPushConstantBlocks()
+	{
+		uint32_t count;
+		spvReflectEnumeratePushConstantBlocks((SpvReflectShaderModule*)ID, &count, nullptr);
+		return count;
+	}
+	void ShaderReflection::GetAllPushConstantBlocks(SRPushConstantBlock* block)
+	{
+		uint32_t count = GetNumPushConstantBlocks();
+		std::vector<SpvReflectBlockVariable*> blocks(count);
+		spvReflectEnumeratePushConstantBlocks((SpvReflectShaderModule*)ID, &count, blocks.data());
+		for(uint32_t i = 0; i < count; i++)
+		{
+			block[i].num_constants = blocks[i]->size / sizeof(uint32_t);
+			block[i].bindingIndex = UINT32_MAX;
+		}
 	}
 	void ShaderReflection::GetAllDescriptorSets(SRDescriptorSet* set)
 	{
@@ -74,6 +93,23 @@ namespace RHI
 		default:
 			break;
 		}
+	}
+	static ShaderStage convertSpvType(SpvReflectShaderStageFlagBits stage)
+	{
+		ShaderStage stg = ShaderStage::None;
+		if(stage & SPV_REFLECT_SHADER_STAGE_VERTEX_BIT)
+			stg |= ShaderStage::Vertex;
+		if(stage & SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT)
+			stg |= ShaderStage::Pixel;
+		if(stage & SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT)
+			stg |= ShaderStage::Compute;
+		if(stage & SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT)
+			stg |= ShaderStage::Domain;
+		if(stage & SPV_REFLECT_SHADER_STAGE_TESSELLATION_EVALUATION_BIT)
+			stg |= ShaderStage::Hull;
+		if(stage & SPV_REFLECT_SHADER_STAGE_GEOMETRY_BIT)
+			stg |= ShaderStage::Geometry;
+		return stg;
 	}
 	static DescriptorType convertTOSRType(SpvReflectDescriptorType type, SpvReflectResourceType rtype)
 	{
@@ -117,11 +153,16 @@ namespace RHI
 			bindings[i].name = SPVset->bindings[i]->name;
 		}
 	}
-	auto ShaderReflection::FillRootSignatureDesc(RHI::ShaderStage stage) -> std::tuple<
+	ShaderStage ShaderReflection::GetStage()
+	{
+		return convertSpvType(((SpvReflectShaderModule*)ID)->shader_stage);
+	}
+	auto ShaderReflection::FillRootSignatureDesc() -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>
 	{
+		auto stage = GetStage();
 		RootSignatureDesc rsDesc;
 		std::vector<RootParameterDesc> rootParams;
 		std::vector<std::vector<DescriptorRange>> ranges_vec;
@@ -131,7 +172,7 @@ namespace RHI
 		
 		for (uint32_t i = 0; i < numSets; i++)
 		{
-			auto& ranges = ranges_vec.emplace_back(ranges_vec);
+			auto& ranges = ranges_vec.emplace_back();
 			RHI::RootParameterDesc desc;
 
 			desc.type = RHI::RootParameterType::DescriptorTable;
@@ -150,6 +191,20 @@ namespace RHI
 				ranges.push_back(range);
 			}
 			desc.descriptorTable.ranges = ranges.data();
+			rootParams.push_back(desc);
+		}
+		
+		uint32_t numPushConstants = GetNumPushConstantBlocks();
+		std::vector<RHI::SRPushConstantBlock> blocks(numPushConstants);
+		GetAllPushConstantBlocks(blocks.data());
+		for(auto& block : blocks)
+		{
+			RHI::RootParameterDesc desc;
+			desc.type = RHI::RootParameterType::PushConstant;
+			desc.pushConstant.numConstants = block.num_constants;
+			desc.pushConstant.stage = stage;
+			desc.pushConstant.bindingIndex = block.bindingIndex;
+			desc.pushConstant.offset = 0;
 			rootParams.push_back(desc);
 		}
 		rsDesc.numRootParameters = rootParams.size();
