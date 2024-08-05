@@ -5,6 +5,7 @@
 #include "RootSignature.h"
 #include "result.hpp"
 #include <cstdint>
+#include <span>
 #include <initializer_list>
 #include <string>
 namespace RHI
@@ -23,10 +24,12 @@ namespace RHI
 		uint32_t num_constants;
 		uint32_t bindingIndex;
 	};
+	class ShaderReflection;
 	struct SRDescriptorSet
 	{
 		uint32_t setIndex;
 		uint32_t bindingCount;
+		Weak<ShaderReflection> reflection;
 	};
 	enum class MergeError
 	{
@@ -41,17 +44,11 @@ namespace RHI
 	public:
 		static creation_result<ShaderReflection> CreateFromFile(const char* filename);
 		static creation_result<ShaderReflection> CreateFromMemory(const char* buffer,uint32_t size);
-		auto FillRootSignatureDesc(uint32_t* dynamic_sets = nullptr, uint32_t count = 0) -> std::tuple<
+		static auto FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>>, std::span<const uint32_t> dynamic_sets) -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>;
 		ShaderStage GetStage();
-		[[deprecated("use this at your own risk, as it is not guaranteed to produce perfect results")]]
-		auto Concatenate(const RootSignatureDesc& left, const RootSignatureDesc& right) -> ezr::result<std::tuple<
-			RootSignatureDesc,
-			std::vector<RootParameterDesc>,
-			std::vector<std::vector<DescriptorRange>>>,
-			MergeError>;
 		uint32_t GetNumDescriptorSets();
 		uint32_t GetNumPushConstantBlocks();
 		void GetAllPushConstantBlocks(SRPushConstantBlock*);

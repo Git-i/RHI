@@ -1,4 +1,4 @@
-project('RHI','cpp','c',default_options: ['cpp_std=c++17','werror=false'])
+project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
 
 cmake = import('cmake')
 
@@ -63,5 +63,6 @@ endif
 if(build_machine.system() == 'windows')
     add_project_arguments('-DVK_USE_PLATFORM_WIN32_KHR',language: 'cpp')
 endif
-lib = library('RHI', vulkan_src, include_directories: inc, dependencies: deps)
+lib = library('RHI', vulkan_src, include_directories: inc, dependencies: deps, 
+override_options : ['cpp_std=c++20'])
 rhi_dep = declare_dependency(include_directories: inc, link_with: lib, dependencies: deps)

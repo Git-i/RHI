@@ -1,20 +1,29 @@
 #include "FormatsAndTypes.h"
+#include "Ptr.h"
 #include "RootSignature.h"
 #include "pch.h"
 #include "VulkanSpecific.h"
 #include "../ShaderReflect.h"
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
-#include <pstl/glue_algorithm_defs.h>
+#include <limits>
+#include <ranges>
+#include <span>
 #include <string_view>
 #include <vector>
 #include "result.hpp"
 #include "spirv_reflect.h"
 #include "volk.h"
+
 namespace RHI
 {
+	static constexpr size_t operator""_sz(unsigned long long int x)
+	{
+		return static_cast<size_t>(x);
+	}
 	creation_result<ShaderReflection> ShaderReflection::CreateFromFile(const char* filename)
 	{
 		Ptr<vShaderReflection> vReflection(new vShaderReflection);
@@ -39,7 +48,7 @@ namespace RHI
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
 		SpvReflectResult result = spvReflectCreateShaderModule(size, buffer, module);
-		
+
 		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
 	uint32_t ShaderReflection::GetNumDescriptorSets()
@@ -74,6 +83,7 @@ namespace RHI
 		{
 			set[i].setIndex = sets[i]->set;
 			set[i].bindingCount = sets[i]->binding_count;
+			set[i].reflection = make_ptr(this);
 		}
 	}
 	void ShaderReflection::GetDescriptorSet(uint32_t set_index, SRDescriptorSet* set)
@@ -82,6 +92,7 @@ namespace RHI
 		auto SPVset = spvReflectGetDescriptorSet((SpvReflectShaderModule*)ID, set_index, &res);
 		set->bindingCount = SPVset->binding_count;
 		set->setIndex = SPVset->set;
+		set->reflection = make_ptr(this);
 	}
 	static DescriptorClass convertTOSRType(SpvReflectResourceType type)
 	{
@@ -172,69 +183,130 @@ namespace RHI
 	{
 		return convertSpvType(((SpvReflectShaderModule*)ID)->shader_stage);
 	}
-	auto ShaderReflection::FillRootSignatureDesc(uint32_t* dynamic_sets, uint32_t count) -> std::tuple<
+	static bool DifferentStages(std::span<Ptr<ShaderReflection>> refl)
+	{
+		RHI::ShaderStage stage;
+		for(auto ptr : refl)
+		{
+			if((stage & ptr->GetStage()) != RHI::ShaderStage::None) return false;
+			stage |= ptr->GetStage();
+		}
+		return true;
+	}
+	std::vector<SRDescriptorSet> GetSetsForIndex(std::vector<std::vector<SRDescriptorSet>>& sets,
+		std::span<RHI::Ptr<ShaderReflection>> refl,
+		uint32_t index)
+	{
+		std::vector<SRDescriptorSet> retVal;
+		auto sz = refl.size();
+		for(auto i : std::views::iota(0_sz, sz))
+		{
+			for(auto& set: sets[i])
+			{
+				if(set.setIndex == index)
+				{
+					retVal.push_back(set);
+				}
+			}
+		}
+		return retVal;
+	}
+	std::vector<std::pair<SRDescriptorBinding, ShaderStage>> GetBindingsForIndex(std::vector<SRDescriptorSet>& sets, uint32_t index)
+	{
+		std::vector<std::pair<SRDescriptorBinding, ShaderStage>> retVal;
+		auto sz = sets.size();
+		for(auto i : std::views::iota(0_sz, sz))
+		{
+			std::vector<SRDescriptorBinding> bindings(sets[i].bindingCount);
+			sets[i].reflection->GetDescriptorSetBindings(&sets[i], bindings.data());
+			for(auto& binding : bindings)
+			{
+				if(binding.bindingSlot == index)
+				{
+					retVal.push_back(std::pair{binding, sets[i].reflection->GetStage()});
+				}
+			}
+		}
+		return retVal;
+	}
+	auto ShaderReflection::FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>> refl, std::span<const uint32_t> dynamic_sets) -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>
 	{
-		auto stage = GetStage();
+		assert(DifferentStages(refl) && "Cannot Have Two shaders for the same stage");
 		RootSignatureDesc rsDesc;
-		std::vector<RootParameterDesc> rootParams;
-		std::vector<std::vector<DescriptorRange>> ranges_vec;
-		uint32_t numSets = GetNumDescriptorSets();
-		std::vector<RHI::SRDescriptorSet> sets(numSets);
-		GetAllDescriptorSets(sets.data());
-		
-		for (uint32_t i = 0; i < numSets; i++)
+		std::vector<RootParameterDesc> rpDescs;
+		std::vector<std::vector<DescriptorRange>> ranges;
+		std::vector<std::vector<SRDescriptorSet>> sets;
+		for(auto ptr : refl)
 		{
-			RHI::RootParameterDesc desc;
-			std::vector<RHI::SRDescriptorBinding> bindings(sets[i].bindingCount);
-			GetDescriptorSetBindings(&sets[i], bindings.data());
-			if(std::find(dynamic_sets, dynamic_sets + count, sets[i].setIndex) != dynamic_sets + count)
+			sets.emplace_back(ptr->GetNumDescriptorSets());
+			ptr->GetAllDescriptorSets(sets.back().data());
+		}
+		uint32_t max_set_index = 0;
+		for(auto& set: sets)
+		{
+			max_set_index = std::max(max_set_index, [&]()->uint32_t{
+				uint32_t max = 0;
+				for(auto& srSet: set)
+				{
+					max = std::max(max, srSet.setIndex);
+				}
+				return max;
+			}());
+		}
+		for(uint32_t i : std::views::iota(0U, max_set_index))
+		{
+			std::vector current_sets = GetSetsForIndex(sets, refl, i);
+			if(current_sets.size() == 0) continue;
+			auto& param = rpDescs.emplace_back();
+			if(std::find(dynamic_sets.begin(), dynamic_sets.end(), i) != dynamic_sets.end())
 			{
-				assert(bindings.size() == 1 && "Dynamic Descriptors only have one binding");
-				desc.type = RHI::RootParameterType::DynamicDescriptor;
-				desc.dynamicDescriptor.type = DynamicOf(bindings[0].resourceType);
-				desc.dynamicDescriptor.setIndex = sets[i].setIndex;
-				desc.dynamicDescriptor.stage = stage;
-				rootParams.push_back(desc);
+			    assert(current_sets.size());
+				SRDescriptorBinding bnd;
+				current_sets[0].reflection->GetDescriptorSetBindings(&current_sets[0], &bnd);
+				for(auto& set : current_sets)
+				{
+				    assert(set.bindingCount == 1 && "Dynamic Descriptors Have only One Binding");
+					SRDescriptorBinding bnd2;
+					set.reflection->GetDescriptorSetBindings(&set, &bnd2);
+					assert(bnd2.bindingSlot == bnd.bindingSlot && bnd.resourceType == bnd2.resourceType);
+				}
+
+			    param.type = RootParameterType::DynamicDescriptor;
+				param.dynamicDescriptor.type = DynamicOf(bnd.resourceType);
+				param.dynamicDescriptor.setIndex = i;
+				param.dynamicDescriptor.stage = ShaderStage::None;
+				for(auto& set : current_sets) param.dynamicDescriptor.stage |= set.reflection->GetStage();
 				continue;
 			}
-			auto& ranges = ranges_vec.emplace_back();
-
-			desc.type = RHI::RootParameterType::DescriptorTable;
-			desc.descriptorTable.setIndex = sets[i].setIndex;
-			desc.descriptorTable.numDescriptorRanges = sets[i].bindingCount;
-			//fill out all the ranges (descriptors)
-			for (uint32_t j = 0; j < sets[i].bindingCount; j++)
+			param.type = RootParameterType::DescriptorTable;
+			param.descriptorTable.setIndex = i;
+			auto& curr_ranges = ranges.emplace_back();
+			//fill ranges
+			uint32_t max_binding_c = 0;
+			for(auto& set: current_sets)
 			{
-				RHI::DescriptorRange range;
-				range.BaseShaderRegister = bindings[j].bindingSlot;
-				range.numDescriptors = bindings[j].count;
-				range.type = bindings[j].resourceType;
-				range.stage = stage;
-				ranges.push_back(range);
+			    max_binding_c = std::max(max_binding_c, set.bindingCount);
 			}
-			desc.descriptorTable.ranges = ranges.data();
-			rootParams.push_back(desc);
+			for(uint32_t j : std::views::iota(0U, max_binding_c))
+			{
+				std::vector bindings = GetBindingsForIndex(current_sets, j);
+				if(bindings.size() == 0) continue;
+				auto& range = curr_ranges.emplace_back();
+				range.BaseShaderRegister = bindings[0].first.bindingSlot;
+				range.numDescriptors = bindings[0].first.count;
+				range.type = bindings[0].first.resourceType;
+				range.stage = ShaderStage::None;
+				for(auto& bnd : bindings) range.stage |= bnd.second;
+			}
+			param.descriptorTable.numDescriptorRanges = curr_ranges.size();
+			param.descriptorTable.ranges = curr_ranges.data();
 		}
-		
-		uint32_t numPushConstants = GetNumPushConstantBlocks();
-		std::vector<RHI::SRPushConstantBlock> blocks(numPushConstants);
-		GetAllPushConstantBlocks(blocks.data());
-		for(auto& block : blocks)
-		{
-			RHI::RootParameterDesc desc;
-			desc.type = RHI::RootParameterType::PushConstant;
-			desc.pushConstant.numConstants = block.num_constants;
-			desc.pushConstant.stage = stage;
-			desc.pushConstant.bindingIndex = block.bindingIndex;
-			desc.pushConstant.offset = 0;
-			rootParams.push_back(desc);
-		}
-		rsDesc.numRootParameters = rootParams.size();
-		rsDesc.rootParameters = rootParams.data();
-		return {rsDesc, std::move(rootParams), std::move(ranges_vec)};
+		rsDesc.numRootParameters = rpDescs.size();
+		rsDesc.rootParameters = rpDescs.data();
+		return std::tuple{rsDesc, std::move(rpDescs), std::move(ranges)};
 	}
 	RootParameterDesc* GetParamForSet(const RootSignatureDesc& sig, uint32_t set)
 	{
@@ -259,69 +331,5 @@ namespace RHI
 			}
 		}
 		return nullptr;
-	}
-	ezr::result<std::vector<DescriptorRange>, MergeError> MergeDescriptorTable(RootParameterDesc& out, const DescriptorTable& p1, const DescriptorTable& p2)
-	{
-		out.type = RootParameterType::DescriptorTable;
-		out.descriptorTable.numDescriptorRanges = p1.numDescriptorRanges + p2.numDescriptorRanges;
-		std::vector<DescriptorRange> ranges(out.descriptorTable.numDescriptorRanges);
-		//todo add checking
-		ranges.insert(ranges.begin(), p1.ranges, p1.ranges + p1.numDescriptorRanges);
-		ranges.insert(ranges.begin(), p2.ranges, p2.ranges + p2.numDescriptorRanges);
-		out.descriptorTable.ranges = ranges.data();
-		return ezr::ok(std::move(ranges));
-	}
-	auto ShaderReflection::Concatenate(const RootSignatureDesc& left, const RootSignatureDesc& right) -> ezr::result<std::tuple<
-			RootSignatureDesc,
-			std::vector<RootParameterDesc>,
-			std::vector<std::vector<DescriptorRange>>>,
-			MergeError>
-	{
-		RootSignatureDesc final;
-		std::vector<RootParameterDesc> rpDesc;
-		std::vector<std::vector<DescriptorRange>> ranges;
-		std::vector<uint32_t> r_indices(right.numRootParameters);
-		for(uint32_t i = 0; i < right.numRootParameters; i++)
-		{
-			r_indices[i] = i;
-		}
-		for(uint32_t i = 0; i < left.numRootParameters; i++)
-		{
-			auto& rp = left.rootParameters[i];
-			if(rp.type == RootParameterType::DescriptorTable)
-			{
-				auto r_rp = GetParamForSet(right, rp.descriptorTable.setIndex);
-				if(r_rp)
-				{
-					auto res = MergeDescriptorTable(rpDesc.emplace_back(), rp.descriptorTable, r_rp->descriptorTable);
-					if(res.is_err())
-					{
-						return ezr::err(std::move(res).err());
-					}
-					ranges.emplace_back(std::move(res).value());
-					r_indices.erase(std::remove(r_indices.begin(), r_indices.end(), r_rp - right.rootParameters));
-				}
-			}
-			else if(rp.type == RootParameterType::DynamicDescriptor)
-			{
-				if(GetParamForSet(right, rp.dynamicDescriptor.setIndex))
-				{
-					return ezr::err(MergeError::DynamicDescriptorConflict);
-				}
-				rpDesc.push_back(rp);
-			}
-			else if(rp.type == RootParameterType::PushConstant)
-			{
-				rpDesc.push_back(rp);	
-			}
-		}
-		for(auto index: r_indices)
-		{
-			auto& rp = right.rootParameters[index];
-			rpDesc.push_back(rp);
-		}
-		final.numRootParameters = rpDesc.size();
-		final.rootParameters = rpDesc.data();
-		return ezr::ok(std::tuple{final, std::move(rpDesc), std::move(ranges)});
 	}
 }
