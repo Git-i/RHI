@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
@@ -229,11 +230,12 @@ namespace RHI
 		}
 		return retVal;
 	}
-	auto ShaderReflection::FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>> refl, std::span<const uint32_t> dynamic_sets) -> std::tuple<
+	auto ShaderReflection::FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>> refl, std::span<const uint32_t> dynamic_sets, std::optional<uint32_t> push_block) -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>
 	{
+		using enum RootParameterType;
 		assert(DifferentStages(refl) && "Cannot Have Two shaders for the same stage");
 		RootSignatureDesc rsDesc;
 		std::vector<RootParameterDesc> rpDescs;
@@ -241,6 +243,17 @@ namespace RHI
 		std::vector<std::vector<SRDescriptorSet>> sets;
 		for(auto ptr : refl)
 		{
+			std::vector<SRPushConstantBlock> blks(ptr->GetNumPushConstantBlocks());
+			ptr->GetAllPushConstantBlocks(blks.data());
+			for(auto& blk : blks)
+			{
+				auto& desc = rpDescs.emplace_back();
+				desc.type = PushConstant;
+				desc.pushConstant.numConstants = blk.num_constants;
+				desc.pushConstant.bindingIndex = blk.bindingIndex;
+				desc.pushConstant.offset = 0;
+				desc.pushConstant.stage = ptr->GetStage();
+			}
 			sets.emplace_back(ptr->GetNumDescriptorSets());
 			ptr->GetAllDescriptorSets(sets.back().data());
 		}
@@ -304,6 +317,7 @@ namespace RHI
 			param.descriptorTable.numDescriptorRanges = curr_ranges.size();
 			param.descriptorTable.ranges = curr_ranges.data();
 		}
+		
 		rsDesc.numRootParameters = rpDescs.size();
 		rsDesc.rootParameters = rpDescs.data();
 		return std::tuple{rsDesc, std::move(rpDescs), std::move(ranges)};
