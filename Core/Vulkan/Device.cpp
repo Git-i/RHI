@@ -16,6 +16,7 @@
 #include "VulkanSpecific.h"
 #include "result.hpp"
 #include "volk.h"
+#include <cstdint>
 #include <memory>
 #include <ranges>
 #include <vector>
@@ -658,7 +659,7 @@ namespace RHI
     creation_result<RootSignature> Device::CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts)
     {
         Ptr<vRootSignature> vrootSignature(new vRootSignature);
-        VkDescriptorSetLayout descriptorSetLayout[20];
+        std::tuple<VkDescriptorSetLayout, RootParameterType, uint32_t> descriptorSetLayout[20];
         VkPushConstantRange pushConstantRanges[20];
 
         VkResult res;
@@ -672,11 +673,12 @@ namespace RHI
             {
                 VkDescriptorSetLayoutCreateInfo layoutInfo;
                 if(desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::ConstantBufferDynamic
-                || desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
+                && desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
-                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                        if(std::get<0>(descriptorSetLayout[j])) 
+                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return ezr::err(CreationError::InvalidParameters);
                 }
@@ -690,15 +692,19 @@ namespace RHI
                 layoutInfo.bindingCount = 1;
                 layoutInfo.pBindings = &binding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, &descriptorSetLayout[numLayouts]);
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, 
+                    &std::get<0>(descriptorSetLayout[numLayouts]));
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
-                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                        if(std::get<0>(descriptorSetLayout[j])) 
+                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
+                std::get<1>(descriptorSetLayout[numLayouts]) = RootParameterType::DynamicDescriptor;
+                std::get<2>(descriptorSetLayout[numLayouts]) = desc->rootParameters[i].dynamicDescriptor.setIndex;
                 numLayouts++;
             }
             else if(desc->rootParameters[i].type == RootParameterType::PushConstant)
@@ -724,26 +730,27 @@ namespace RHI
                 layoutInfo.bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
                 layoutInfo.pBindings = LayoutBinding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, &descriptorSetLayout[numLayouts]);
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, 
+                &std::get<0>(descriptorSetLayout[numLayouts]));
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
-                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                        if(std::get<0>(descriptorSetLayout[j])) 
+                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
+                std::get<1>(descriptorSetLayout[numLayouts]) = RootParameterType::DescriptorTable;
+                std::get<2>(descriptorSetLayout[numLayouts]) = desc->rootParameters[i].descriptorTable.setIndex;
                 numLayouts++;
             }
         }
         VkDescriptorSetLayout layoutInfoSorted[20]{};
         //sort descriptor sets
-        for (uint32_t i = 0; i < desc->numRootParameters; i++)
+        for (uint32_t i = 0; i < numLayouts; i++)
         {
-            if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
-                layoutInfoSorted[desc->rootParameters[i].dynamicDescriptor.setIndex] = descriptorSetLayout[i];
-            else if(desc->rootParameters[i].type == RootParameterType::DescriptorTable)
-                layoutInfoSorted[desc->rootParameters[i].descriptorTable.setIndex] = descriptorSetLayout[i];
+            layoutInfoSorted[std::get<2>(descriptorSetLayout[i])] = std::get<0>(descriptorSetLayout[i]);
         }
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -761,13 +768,14 @@ namespace RHI
         uint32_t layout_idx = 0;
         for (uint32_t i : std::views::iota(0u, numLayouts))
         {
-             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
+            if (std::get<1>(descriptorSetLayout[i]) == RootParameterType::DynamicDescriptor)
             {
-                vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[i], nullptr);
+                vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[i]), nullptr);
                 continue;
             }
+
             pSetLayouts[layout_idx] = Ptr(new vDescriptorSetLayout);
-            pSetLayouts[layout_idx]->ID = descriptorSetLayout[i];
+            pSetLayouts[layout_idx]->ID = std::get<0>(descriptorSetLayout[i]);
             pSetLayouts[layout_idx]->device = make_ptr(this);
             layout_idx++;
         }
@@ -1035,7 +1043,6 @@ namespace RHI
     }
     creation_array_result<DescriptorSet> Device::CreateDescriptorSets(Ptr<DescriptorHeap> heap, std::uint32_t numDescriptorSets, Ptr<DescriptorSetLayout>* layouts)
     {
-        std::unique_ptr<vDescriptorSet[]> vSets(new vDescriptorSet[numDescriptorSets]);
         std::vector<Ptr<DescriptorSet>> returnValues;
         VkDescriptorSetLayout vklayouts[5];
         for (uint32_t i = 0; i < numDescriptorSets; i++)
@@ -1053,14 +1060,13 @@ namespace RHI
 
         for (uint32_t i = 0; i < numDescriptorSets; i++)
         {
-            vSets[i].ID = descriptorSets[i];
-            vSets[i].device = make_ptr(this);
-            vSets[i].heap = heap.transform<vDescriptorHeap>();
-            vSets[i].layout = layouts[i].transform<vDescriptorSetLayout>();
-            auto array = vSets.release();
-            returnValues.push_back(Ptr<DescriptorSet>(&array[i]));
+            auto& ptr = returnValues.emplace_back(new vDescriptorSet);
+            ptr.retrieve_as_forced<vDescriptorSet>()->ID = descriptorSets[i];
+            ptr.retrieve_as_forced<vDescriptorSet>()->device = make_ptr(this);
+            ptr.retrieve_as_forced<vDescriptorSet>()->heap = heap.transform<vDescriptorHeap>();
+            ptr.retrieve_as_forced<vDescriptorSet>()->layout = layouts[i].transform<vDescriptorSetLayout>();
         }
-        return creation_array_result<DescriptorSet>::ok(returnValues);
+        return creation_array_result<DescriptorSet>::ok(std::move(returnValues));
     }
     Texture* Device::WrapNativeTexture(Internal_ID id)
     {
