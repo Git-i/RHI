@@ -269,6 +269,7 @@ namespace RHI
 				return max;
 			}());
 		}
+		max_set_index++;
 		for(uint32_t i : std::views::iota(0U, max_set_index))
 		{
 			std::vector current_sets = GetSetsForIndex(sets, refl, i);
