@@ -17,6 +17,7 @@
 #include "result.hpp"
 #include "volk.h"
 #include <memory>
+#include <ranges>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
@@ -656,11 +657,8 @@ namespace RHI
     }
     creation_result<RootSignature> Device::CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts)
     {
-        vDescriptorSetLayout* vSetLayouts = new vDescriptorSetLayout[desc->numRootParameters];
         Ptr<vRootSignature> vrootSignature(new vRootSignature);
         VkDescriptorSetLayout descriptorSetLayout[20];
-        VkDescriptorSetLayoutCreateInfo layoutInfo[20]{};
-
         VkPushConstantRange pushConstantRanges[20];
 
         VkResult res;
@@ -672,25 +670,33 @@ namespace RHI
         {
             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
             {
-                GFX_ASSERT(desc->rootParameters[i].dynamicDescriptor.type == DescriptorType::ConstantBufferDynamic
-                || desc->rootParameters[i].dynamicDescriptor.type == DescriptorType::StructuredBufferDynamic);
+                VkDescriptorSetLayoutCreateInfo layoutInfo;
+                if(desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::ConstantBufferDynamic
+                || desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
+                {
+                    for(uint32_t j = 0; j < numLayouts; j++)
+                    {
+                        if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
+                    }
+                    return ezr::err(CreationError::InvalidParameters);
+                }
+
                 VkDescriptorSetLayoutBinding binding;
                 binding.binding = 0;
                 binding.descriptorCount = 1;
                 binding.descriptorType = DescType(desc->rootParameters[i].dynamicDescriptor.type);
                 binding.pImmutableSamplers = nullptr;
                 binding.stageFlags = VkShaderStage(desc->rootParameters[i].dynamicDescriptor.stage);
-                layoutInfo[numLayouts].bindingCount = 1;
-                layoutInfo[numLayouts].pBindings = &binding;
-                layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                layoutInfo.bindingCount = 1;
+                layoutInfo.pBindings = &binding;
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, &descriptorSetLayout[numLayouts]);
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
                         if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
                     }
-                    delete[] vSetLayouts;
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
                 numLayouts++;
@@ -705,6 +711,7 @@ namespace RHI
             }
             else if(desc->rootParameters[i].type == RootParameterType::DescriptorTable)
             {
+                VkDescriptorSetLayoutCreateInfo layoutInfo;
                 VkDescriptorSetLayoutBinding LayoutBinding[20] = {};
                 for (uint32_t j = 0; j < desc->rootParameters[i].descriptorTable.numDescriptorRanges; j++)
                 {
@@ -714,21 +721,18 @@ namespace RHI
                     LayoutBinding[j].pImmutableSamplers = nullptr;
                     LayoutBinding[j].stageFlags = VkShaderStage(desc->rootParameters[i].descriptorTable.ranges[j].stage);
                 }
-                layoutInfo[numLayouts].bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
-                layoutInfo[numLayouts].pBindings = LayoutBinding;
-                layoutInfo[numLayouts].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo[numLayouts], nullptr, &descriptorSetLayout[numLayouts]);
+                layoutInfo.bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
+                layoutInfo.pBindings = LayoutBinding;
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, &descriptorSetLayout[numLayouts]);
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
                         if(descriptorSetLayout[j]) vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[j], nullptr);
                     }
-                    delete[] vSetLayouts;
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
-                pSetLayouts[numLayouts] = make_ptr(&vSetLayouts[numLayouts]);
-                vSetLayouts[numLayouts].device = make_ptr(this);
                 numLayouts++;
             }
         }
@@ -751,18 +755,21 @@ namespace RHI
         res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
         if(res < 0)
         {
-            delete[] vSetLayouts;
             return creation_result<RootSignature>::err(marshall_error(res));
         }
         vrootSignature->device = make_ptr(this);
-        for (uint32_t i = 0; i < desc->numRootParameters; i++)
+        uint32_t layout_idx = 0;
+        for (uint32_t i : std::views::iota(0u, numLayouts))
         {
-            if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
+             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
             {
                 vkDestroyDescriptorSetLayout((VkDevice)ID, descriptorSetLayout[i], nullptr);
                 continue;
             }
-            vSetLayouts[i].ID = descriptorSetLayout[i];
+            pSetLayouts[layout_idx] = Ptr(new vDescriptorSetLayout);
+            pSetLayouts[layout_idx]->ID = descriptorSetLayout[i];
+            pSetLayouts[layout_idx]->device = make_ptr(this);
+            layout_idx++;
         }
         return creation_result<RootSignature>::ok(vrootSignature);
     }
