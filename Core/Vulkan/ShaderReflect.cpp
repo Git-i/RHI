@@ -230,6 +230,9 @@ namespace RHI
 		}
 		return retVal;
 	}
+	/*
+		Push Constants must be on set 0
+	*/
 	auto ShaderReflection::FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>> refl, std::span<const uint32_t> dynamic_sets, std::optional<uint32_t> push_block) -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,
@@ -247,10 +250,11 @@ namespace RHI
 			ptr->GetAllPushConstantBlocks(blks.data());
 			for(auto& blk : blks)
 			{
+				assert(push_block.has_value());
 				auto& desc = rpDescs.emplace_back();
 				desc.type = PushConstant;
 				desc.pushConstant.numConstants = blk.num_constants;
-				desc.pushConstant.bindingIndex = blk.bindingIndex;
+				desc.pushConstant.bindingIndex = push_block.value();
 				desc.pushConstant.offset = 0;
 				desc.pushConstant.stage = ptr->GetStage();
 			}

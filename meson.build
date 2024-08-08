@@ -2,10 +2,7 @@ project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
 
 cmake = import('cmake')
 
-glfw_opt = cmake.subproject_options()
-glfw_opt.add_cmake_defines({'GLFW_BUILD_WAYLAND':get_option('linux_use_wayland')})
-glfw_opt.add_cmake_defines({'GLFW_BUILD_X11':get_option('linux_use_x11')})
-glfw3 = cmake.subproject('glfw',options: glfw_opt)
+glfw3 = cmake.subproject('glfw')
 glfw3_dep = glfw3.dependency('glfw')
 
 inc_list = [

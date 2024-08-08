@@ -61,6 +61,7 @@ namespace RHI
 		creation_result<DebugBuffer> CreateDebugBuffer();
 		std::uint32_t GetDescriptorHeapIncrementSize(DescriptorType type);
 		creation_result<Texture> GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index);
+		uint32_t GetConstantBufferAlignment();
 		RESULT GetMemorySharingCapabilites();
 		RESULT ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle);
 		//This is not staying

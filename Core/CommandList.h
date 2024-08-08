@@ -7,6 +7,7 @@
 #include "DescriptorHeap.h"
 #include "DebugBuffer.h"
 #include "PipelineStateObject.h"
+#include <span>
 namespace RHI
 {
 	struct RenderingBeginDesc;
@@ -30,8 +31,8 @@ namespace RHI
 		//CommandAllocator Passed must be the one used to create the command list.
 		void CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent,Weak<Texture> src,Weak<Texture> dst);
 		RESULT Begin(Ptr<CommandAllocator> allocator);
-		void PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
-		void ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers);
+		void PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::span<BufferMemoryBarrier> bufferBarriers, std::span<TextureMemoryBarrier> textureBarriers);
+		void ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::span<BufferMemoryBarrier> bufferBarriers, std::span<TextureMemoryBarrier> textureBarriers);
 		void SetPipelineState(Weak<PipelineStateObject> pso);
 		void SetComputePipeline(Weak<ComputePipeline> cp);
 		void BindComputeDescriptorSet(Weak<DescriptorSet> set, std::uint32_t setIndex);

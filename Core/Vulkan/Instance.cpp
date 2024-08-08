@@ -6,6 +6,7 @@
 #include "Core.h"
 #include "volk.h"
 #include "VulkanSpecific.h"
+#include <type_traits>
 #include <vector>
 #include <iostream>
 #include <array>
@@ -42,12 +43,12 @@ extern "C"
 		volkInitialize();
 		VkValidationFeatureEnableEXT enabled[] =
 		{
-			VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT
+			VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
 		};
 		VkValidationFeaturesEXT features{};
 		features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
 		features.pEnabledValidationFeatures = enabled;
-		features.enabledValidationFeatureCount = 0;
+		features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(std::remove_all_extents_t<	decltype(enabled)>);
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "NULL";

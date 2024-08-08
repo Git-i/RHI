@@ -60,44 +60,46 @@ namespace RHI
             break;
         }
     }
-    void GraphicsCommandList::PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* bufferBarrier,std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
+    void GraphicsCommandList::PipelineBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::span<BufferMemoryBarrier> bufferBarriers, std::span<TextureMemoryBarrier> textureBarriers)
     {
         VkBufferMemoryBarrier BufferBarr[10]{};
         VkImageMemoryBarrier ImageBarr[100]{};
-        for (uint32_t i = 0; i < numBufferBarriers; i++)
+        for (uint32_t i = 0; i < bufferBarriers.size(); i++)
         {
-            BufferBarr[i].buffer = (VkBuffer)bufferBarrier[i].buffer->ID;
-            BufferBarr[i].srcAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsBefore;
-            BufferBarr[i].dstAccessMask = (VkAccessFlags)bufferBarrier[i].AccessFlagsAfter;
-            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), bufferBarrier[i].previousQueue);
-            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), bufferBarrier[i].nextQueue);
+            auto& barrier = bufferBarriers[i];
+            BufferBarr[i].buffer = (VkBuffer)barrier.buffer->ID;
+            BufferBarr[i].srcAccessMask = (VkAccessFlags)barrier.AccessFlagsBefore;
+            BufferBarr[i].dstAccessMask = (VkAccessFlags)barrier.AccessFlagsAfter;
+            BufferBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue);
+            BufferBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue);
             if (BufferBarr[i].srcQueueFamilyIndex == BufferBarr[i].dstQueueFamilyIndex)
                 BufferBarr[i].srcQueueFamilyIndex = BufferBarr[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            BufferBarr[i].offset = bufferBarrier[i].offset;
+            BufferBarr[i].offset = barrier.offset;
             BufferBarr[i].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-            BufferBarr[i].size = bufferBarrier[i].size;
+            BufferBarr[i].size = barrier.size;
         }
-        for (uint32_t i = 0; i < numImageBarriers; i++)
+        for (uint32_t i = 0; i < textureBarriers.size(); i++)
         {
+            auto& barrier = textureBarriers[i];
             ImageBarr[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            ImageBarr[i].image = (VkImage)pImageBarriers[i].texture->ID;
-            ImageBarr[i].newLayout = (VkImageLayout)pImageBarriers[i].newLayout;
-            ImageBarr[i].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
-            ImageBarr[i].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
-            ImageBarr[i].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue);
-            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue);
+            ImageBarr[i].image = (VkImage)barrier.texture->ID;
+            ImageBarr[i].newLayout = (VkImageLayout)barrier.newLayout;
+            ImageBarr[i].oldLayout = (VkImageLayout)barrier.oldLayout;
+            ImageBarr[i].srcAccessMask = (VkAccessFlags)barrier.AccessFlagsBefore;
+            ImageBarr[i].dstAccessMask = (VkAccessFlags)barrier.AccessFlagsAfter;
+            ImageBarr[i].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue);
+            ImageBarr[i].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue);
             VkImageSubresourceRange range;
-            range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
-            range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
-            range.baseArrayLayer = pImageBarriers[i].subresourceRange.FirstArraySlice;
-            range.layerCount = pImageBarriers[i].subresourceRange.NumArraySlices;
-            range.levelCount = pImageBarriers[i].subresourceRange.NumMipLevels;
+            range.aspectMask = (VkImageAspectFlags)barrier.subresourceRange.imageAspect;
+            range.baseMipLevel = barrier.subresourceRange.IndexOrFirstMipLevel;
+            range.baseArrayLayer = barrier.subresourceRange.FirstArraySlice;
+            range.layerCount = barrier.subresourceRange.NumArraySlices;
+            range.levelCount = barrier.subresourceRange.NumMipLevels;
             ImageBarr[i].subresourceRange = range;
             if (ImageBarr[i].srcQueueFamilyIndex == ImageBarr[i].dstQueueFamilyIndex)
                 ImageBarr[i].srcQueueFamilyIndex = ImageBarr[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         }
-        vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, numBufferBarriers, BufferBarr, numImageBarriers, ImageBarr);
+        vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, bufferBarriers.size(), BufferBarr, textureBarriers.size(), ImageBarr);
     }
     void GraphicsCommandList::BeginRendering(const RenderingBeginDesc& desc)
     {
@@ -287,48 +289,50 @@ namespace RHI
         vkCmdCopyImage((VkCommandBuffer)ID, (VkImage)src->ID, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, (VkImage)dst->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
     }
 
-    void GraphicsCommandList::ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::uint32_t numBufferBarriers, BufferMemoryBarrier* pbufferBarriers, std::uint32_t numImageBarriers, TextureMemoryBarrier* pImageBarriers)
+    void GraphicsCommandList::ReleaseBarrier(PipelineStage syncBefore, PipelineStage syncAfter, std::span<BufferMemoryBarrier> bufferBarriers, std::span<TextureMemoryBarrier> textureBarriers)
     {
         VkBufferMemoryBarrier BufferBarr[10]{};
         VkImageMemoryBarrier ImageBarr[100]{};
         int bn = 0, tn = 0;
-        for (uint32_t i = 0; i < numBufferBarriers; i++)
+        for (uint32_t i = 0; i < bufferBarriers.size(); i++)
         {
-            if (QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].nextQueue))
+            auto& barrier = bufferBarriers[i];
+            if (QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue))
                 continue;
-            BufferBarr[bn].buffer = (VkBuffer)pbufferBarriers[i].buffer->ID;
-            BufferBarr[bn].srcAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsBefore;
-            BufferBarr[bn].dstAccessMask = (VkAccessFlags)pbufferBarriers[i].AccessFlagsAfter;
-            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].previousQueue);
-            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pbufferBarriers[i].nextQueue);
-            BufferBarr[bn].offset = pbufferBarriers[i].offset;
+            BufferBarr[bn].buffer = (VkBuffer)barrier.buffer->ID;
+            BufferBarr[bn].srcAccessMask = (VkAccessFlags)barrier.AccessFlagsBefore;
+            BufferBarr[bn].dstAccessMask = (VkAccessFlags)barrier.AccessFlagsAfter;
+            BufferBarr[bn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue);
+            BufferBarr[bn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue);
+            BufferBarr[bn].offset = barrier.offset;
             BufferBarr[bn].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-            BufferBarr[bn].size = pbufferBarriers[i].size;
+            BufferBarr[bn].size = barrier.size;
             bn++;
         }
-        for (uint32_t i = 0; i < numImageBarriers; i++)
+        for (uint32_t i = 0; i < textureBarriers.size(); i++)
         {
-            if(QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue))
+            auto& barrier = textureBarriers[i];
+            if(QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue) == QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue))
                 continue;
             ImageBarr[tn].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            ImageBarr[tn].image = (VkImage)pImageBarriers[i].texture->ID;
-            ImageBarr[tn].newLayout = (VkImageLayout)pImageBarriers[i].newLayout;
-            ImageBarr[tn].oldLayout = (VkImageLayout)pImageBarriers[i].oldLayout;
-            ImageBarr[tn].srcAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsBefore;
-            ImageBarr[tn].dstAccessMask = (VkAccessFlags)pImageBarriers[i].AccessFlagsAfter;
-            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].previousQueue);
-            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), pImageBarriers[i].nextQueue);
+            ImageBarr[tn].image = (VkImage)barrier.texture->ID;
+            ImageBarr[tn].newLayout = (VkImageLayout)barrier.newLayout;
+            ImageBarr[tn].oldLayout = (VkImageLayout)barrier.oldLayout;
+            ImageBarr[tn].srcAccessMask = (VkAccessFlags)barrier.AccessFlagsBefore;
+            ImageBarr[tn].dstAccessMask = (VkAccessFlags)barrier.AccessFlagsAfter;
+            ImageBarr[tn].srcQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.previousQueue);
+            ImageBarr[tn].dstQueueFamilyIndex = QueueFamilyInd(device.retrieve_as_forced<vDevice>(), barrier.nextQueue);
             VkImageSubresourceRange range;
-            range.aspectMask = (VkImageAspectFlags)pImageBarriers[i].subresourceRange.imageAspect;
-            range.baseMipLevel = pImageBarriers[i].subresourceRange.IndexOrFirstMipLevel;
-            range.baseArrayLayer = pImageBarriers[i].subresourceRange.FirstArraySlice;
-            range.layerCount = pImageBarriers[i].subresourceRange.NumArraySlices;
-            range.levelCount = pImageBarriers[i].subresourceRange.NumMipLevels;
+            range.aspectMask = (VkImageAspectFlags)barrier.subresourceRange.imageAspect;
+            range.baseMipLevel = barrier.subresourceRange.IndexOrFirstMipLevel;
+            range.baseArrayLayer = barrier.subresourceRange.FirstArraySlice;
+            range.layerCount = barrier.subresourceRange.NumArraySlices;
+            range.levelCount = barrier.subresourceRange.NumMipLevels;
             ImageBarr[tn].subresourceRange = range;
             tn++;
         }
         if(bn+tn)
-            vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, numBufferBarriers, BufferBarr, numImageBarriers, ImageBarr);
+            vkCmdPipelineBarrier((VkCommandBuffer)ID, (VkFlags)syncBefore, (VkFlags)syncAfter, 0, 0, nullptr, bn, BufferBarr, tn, ImageBarr);
     }
 
     void GraphicsCommandList::SetComputePipeline(Weak<ComputePipeline> cp)
