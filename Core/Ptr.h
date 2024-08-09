@@ -112,6 +112,7 @@ namespace RHI
         {
             return ptr;
         }
+        [[deprecated("Try not to use this too often")]]
         T* Raw() const
         {
             return ptr;
@@ -193,6 +194,7 @@ namespace RHI
         {
             this->ptr = ptr.Get();
         }
+        [[deprecated("Try not to use this too often")]]
         T* Raw() const
         {
             return ptr;

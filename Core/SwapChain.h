@@ -1,4 +1,5 @@
 #pragma once
+#include "Fence.h"
 #include "Object.h"
 #include "FormatsAndTypes.h"
 #include "Surface.h"
@@ -10,8 +11,7 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(SwapChain);
 	public:
-		RESULT Present(std::uint32_t imgIndex,std::uint32_t cycle);
-		RESULT AcquireImage(std::uint32_t* imgIndex, std::uint32_t cycle);
+		RESULT Present(RHI::Weak<RHI::Fence> waitBeforePresent, uint64_t waitVal);
 
 	};
 	struct RHI_API SwapChainDesc

@@ -2,7 +2,9 @@
 #include "../SwapChain.h"
 #include "volk.h"
 #include "VulkanSpecific.h"
+#include <cstdint>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 namespace RHI
 {
 	SwapChainDesc::SwapChainDesc(Default_t)
@@ -25,25 +27,42 @@ namespace RHI
 	SwapChainDesc::SwapChainDesc()
 	{
 	}
-	RESULT SwapChain::Present(std::uint32_t imgIndex, std::uint32_t cycle)
+	/*
+	Wait for the previous acquired image to be ready and for the passed Fence to be completed
+	Present and acquire the next image to be presented
+	*/
+	RESULT SwapChain::Present(Weak<Fence> wait, uint64_t val)
 	{
 		auto vchain = ((vSwapChain*)this);
+		auto dev = (VkDevice)(device.retrieve_as_forced<vDevice>())->ID;
+		VkTimelineSemaphoreSubmitInfo timelineInfo{};
+		timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+		timelineInfo.pNext = NULL;
+		timelineInfo.waitSemaphoreValueCount = 1;
+		timelineInfo.pWaitSemaphoreValues = &val;
+		VkSubmitInfo submitInfo = {};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.pNext = &timelineInfo;
+		submitInfo.waitSemaphoreCount = 1;
+		VkPipelineStageFlags fg = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		submitInfo.pWaitDstStageMask = &fg;
+		submitInfo.pWaitSemaphores = (VkSemaphore*)&wait->ID;
+		vkQueueSubmit(vchain->PresentQueue_ID, 1, &submitInfo, VK_NULL_HANDLE);
+
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &vchain->present_semaphore[cycle];
+		presentInfo.pNext = nullptr;
+		presentInfo.waitSemaphoreCount = 0;
+		presentInfo.pWaitSemaphores = nullptr;
 		VkSwapchainKHR swapChains[] = { (VkSwapchainKHR)ID };
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
-		presentInfo.pImageIndices = &imgIndex;
+		presentInfo.pImageIndices = &vchain->imgIndex;
+		vkWaitForFences(dev, 1, &vchain->imageAcquired, true, UINT64_MAX);
+
 		vkQueuePresentKHR(((vSwapChain*)this)->PresentQueue_ID, &presentInfo);
+		vkResetFences(dev, 1, &vchain->imageAcquired);
+		vkAcquireNextImageKHR(dev, (VkSwapchainKHR)ID, UINT64_MAX, VK_NULL_HANDLE, vchain->imageAcquired, &vchain->imgIndex);
 		return RESULT();
-	}
-	RESULT SwapChain::AcquireImage(std::uint32_t* imgIndex, uint32_t cycle)
-	{
-		auto vchain = ((vSwapChain*)this);
-		VkResult res = vkAcquireNextImageKHR((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSwapchainKHR)ID, UINT64_MAX, vchain->present_semaphore[cycle], VK_NULL_HANDLE, imgIndex);
-		if(res != VK_SUCCESS) DEBUG_BREAK;
-		return 0;
 	}
 }

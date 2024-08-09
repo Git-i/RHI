@@ -10,6 +10,7 @@
 #include <vector>
 #include <iostream>
 #include <array>
+#include <vulkan/vulkan_core.h>
 #ifdef USE_GLFW
 #include <GLFW/glfw3.h>
 #endif
@@ -43,12 +44,12 @@ extern "C"
 		volkInitialize();
 		VkValidationFeatureEnableEXT enabled[] =
 		{
-			VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+			//VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
 		};
 		VkValidationFeaturesEXT features{};
 		features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
 		features.pEnabledValidationFeatures = enabled;
-		features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(std::remove_all_extents_t<	decltype(enabled)>);
+		features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(VkValidationFeatureEnableEXT);
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "NULL";
@@ -127,7 +128,7 @@ namespace RHI
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR((VkPhysicalDevice)pDev->ID,(VkSurfaceKHR)surface->ID,&caps);
 		return {caps.minImageCount, caps.maxImageCount};
 	}
-	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* pDevice, Weak<Device> Device, Weak<CommandQueue> pCommandQueue)
+	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* pDevice, Ptr<Device> Device, Weak<CommandQueue> pCommandQueue)
 	{
 		Ptr<vSwapChain> vswapChain(new vSwapChain);
 		VkSwapchainCreateInfoKHR createInfo{};
@@ -165,16 +166,16 @@ namespace RHI
 
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 		VkResult res = vkCreateSwapchainKHR((VkDevice)Device->ID, &createInfo, nullptr, (VkSwapchainKHR*)&vswapChain->ID);
-		if(res < 0) return creation_result<SwapChain>::err(marshall_error(res));
+		if(res < 0) return ezr::err(marshall_error(res));
 		VkSemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		vswapChain->present_semaphore.resize(desc.BufferCount);
-		for(uint32_t i = 0; i < desc.BufferCount; i++)
-		{
-			res = vkCreateSemaphore((VkDevice)Device->ID, &semaphoreInfo, nullptr, &vswapChain->present_semaphore[i]);
-			if(res < 0) return creation_result<SwapChain>::err(marshall_error(res));
-		}
-		vswapChain->device = make_ptr(Device.Raw());
+		VkFenceCreateInfo finfo{};
+		finfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		finfo.flags = 0;
+		res = vkCreateFence((VkDevice)Device->ID,&finfo,0,&vswapChain->imageAcquired);
+		if(res < 0) return ezr::err(marshall_error(res));
+		vkAcquireNextImageKHR((VkDevice)Device->ID, (VkSwapchainKHR)vswapChain->ID, UINT64_MAX, VK_NULL_HANDLE, vswapChain->imageAcquired, &vswapChain->imgIndex);
+		vswapChain->device = Device;
 		Device->Release();
 		vkGetDeviceQueue((VkDevice)Device->ID, indices.presentIndex, 0, (VkQueue*)&vswapChain->PresentQueue_ID);
 		

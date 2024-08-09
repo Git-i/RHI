@@ -292,7 +292,8 @@ namespace RHI
             return VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         }
     public:
-        std::vector<VkSemaphore> present_semaphore;
+        uint32_t imgIndex;
+        VkFence imageAcquired;
         VkQueue PresentQueue_ID;
     };
     class vShaderReflection : public ShaderReflection
