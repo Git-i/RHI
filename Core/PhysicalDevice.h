@@ -6,19 +6,24 @@ namespace RHI
 	{
 		uint8_t data[8] = {};
 	};
+	enum class DeviceType
+	{
+		Integrated, Dedicated, CPU
+	};
 	struct PhysicalDeviceDesc
 	{
-		wchar_t  Description[128];
+		char  Description[128];
 		std::size_t DedicatedVideoMemory;
 		std::size_t SharedSystemMemory;
+		DeviceType type;
 		LUID   AdapterLuid;
 	};
 	class RHI_API PhysicalDevice
 	{
 	public:
 		static RHI::PhysicalDevice* FromNativeHandle(Internal_ID id);
-		RESULT GetDesc(PhysicalDeviceDesc* desc);
-		Internal_ID ID;;
+		PhysicalDeviceDesc GetDesc();
+		Internal_ID ID;
 	};
 
 }
