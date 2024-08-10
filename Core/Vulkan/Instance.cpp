@@ -1,12 +1,11 @@
 #include "FormatsAndTypes.h"
+#include "PhysicalDevice.h"
 #include "Ptr.h"
 #include "SwapChain.h"
-#include "pch.h"
 #include "../Instance.h"
 #include "Core.h"
 #include "volk.h"
 #include "VulkanSpecific.h"
-#include <type_traits>
 #include <vector>
 #include <iostream>
 #include <array>
@@ -38,7 +37,10 @@ extern "C"
 {
 	RESULT RHI_API RHICreateInstance(RHI::Instance** instance)
 	{
-		
+		if(RHI::vInstance::current.IsValid())
+		{
+			return -1;
+		}
 		RHI::vInstance* vinstance = new RHI::vInstance;
 		*instance = vinstance;
 		volkInitialize();
@@ -62,7 +64,6 @@ extern "C"
 		{
 			"VK_LAYER_KHRONOS_validation",
 		};
-		
 		std::vector<const char*> extensionName = { "VK_KHR_surface",VK_EXT_DEBUG_UTILS_EXTENSION_NAME,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
 		#ifdef VK_USE_PLATFORM_WIN32_KHR
 			extensionName.push_back("VK_KHR_win32_surface");
@@ -110,6 +111,25 @@ namespace RHI
 		VkResult res = vkEnumeratePhysicalDevices((VkInstance)ID, &count, &devices[0]);
 		vdevice->ID = devices[id];
 		*device = vdevice;
+		return res;
+	}
+	void Instance::SetLoggerCallback(const std::function<void(LogLevel, std::string_view)>& fn)
+	{	
+		((vInstance*)this)->logCallback = fn;
+	}
+	RESULT Instance::GetAllPhysicalDevices(PhysicalDevice** devices)
+	{
+		std::uint32_t count;
+		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
+		std::vector<VkPhysicalDevice> vk_devices(count);
+		VkResult res = vkEnumeratePhysicalDevices((VkInstance)ID, &count, vk_devices.data());
+		uint32_t i = 0;
+		for(auto dev : vk_devices)
+		{
+			devices[i] = new vPhysicalDevice;
+			devices[i]->ID = dev;
+			i++;
+		}
 		return res;
 	}
 	API Instance::GetInstanceAPI()

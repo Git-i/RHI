@@ -3,6 +3,15 @@
 #include "volk.h"
 namespace RHI
 {
+    
+    Ptr<vInstance> vInstance::current = nullptr;
+    void log(LogLevel lvl, std::string_view msg)
+    {
+        if(vInstance::current->logCallback)
+        {
+            vInstance::current->logCallback(lvl, msg);
+        }
+    }
     VkFormat FormatConv(RHI::Format format)
     {
         using namespace RHI;

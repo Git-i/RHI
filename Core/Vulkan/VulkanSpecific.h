@@ -3,6 +3,7 @@
 #include "../PhysicalDevice.h"
 #include "../Surface.h"
 #include "volk.h"
+#include <string_view>
 #include <vector>
 #include "../Object.h"
 #include "../Buffer.h"
@@ -265,6 +266,8 @@ namespace RHI
     class vInstance : public Instance
     {
     public:
+        static Ptr<vInstance> current;
+        std::function<void(LogLevel, std::string_view)> logCallback;
         VkDebugUtilsMessengerEXT messanger;
         virtual ~vInstance() override
         {
@@ -305,4 +308,5 @@ namespace RHI
             delete ((SpvReflectShaderModule*)Object::ID);
         }
     };
+    void log(LogLevel lvl, std::string_view msg);
 }
