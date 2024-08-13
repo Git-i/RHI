@@ -198,8 +198,13 @@ namespace RHI
 		vkAcquireNextImageKHR((VkDevice)Device->ID, (VkSwapchainKHR)vswapChain->ID, UINT64_MAX, VK_NULL_HANDLE, vswapChain->imageAcquired, &vswapChain->imgIndex);
 		vswapChain->device = Device;
 		Device->Release();
-		vkGetDeviceQueue((VkDevice)Device->ID, indices.presentIndex, 0, (VkQueue*)&vswapChain->PresentQueue_ID);
-		
+		vkGetDeviceQueue((VkDevice)Device->ID, indices.presentIndex, 0, &vswapChain->PresentQueue_ID);
+		VkDebugUtilsObjectNameInfoEXT name_info{};
+		name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		name_info.pObjectName = "Internal Swapchain Fence";
+		name_info.objectHandle = (uint64_t)vswapChain->imageAcquired;
+		name_info.objectType = VK_OBJECT_TYPE_FENCE;
+		vkSetDebugUtilsObjectNameEXT((VkDevice)Device->ID, &name_info);
 		return creation_result<SwapChain>::ok(vswapChain);
 	}
 }
