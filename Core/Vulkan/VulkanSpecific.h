@@ -266,7 +266,7 @@ namespace RHI
     class vInstance : public Instance
     {
     public:
-        static Ptr<vInstance> current;
+        static vInstance* current;
         std::function<void(LogLevel, std::string_view)> logCallback;
         VkDebugUtilsMessengerEXT messanger;
         virtual ~vInstance() override

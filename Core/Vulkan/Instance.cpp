@@ -37,7 +37,7 @@ extern "C"
 {
 	RESULT RHI_API RHICreateInstance(RHI::Instance** instance)
 	{
-		if(RHI::vInstance::current.IsValid())
+		if(RHI::vInstance::current)
 		{
 			return -1;
 		}
@@ -88,6 +88,7 @@ extern "C"
 		createInfo.pfnUserCallback = debugCallback;
 		createInfo.pUserData = nullptr; // Optional
 		vkCreateDebugUtilsMessengerEXT((VkInstance)vinstance->ID, &createInfo, nullptr, &vinstance->messanger);
+		RHI::vInstance::current = vinstance;
 		return res;
 	}
 }

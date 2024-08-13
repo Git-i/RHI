@@ -5,6 +5,7 @@
 #include "DescriptorHeap.h"
 #include "FormatsAndTypes.h"
 #include "Heap.h"
+#include "Instance.h"
 #include "PipelineStateObject.h"
 #include "Ptr.h"
 #include "RootSignature.h"
@@ -17,6 +18,7 @@
 #include "result.hpp"
 #include "volk.h"
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <ranges>
 #include <vector>
@@ -237,6 +239,12 @@ namespace RHI
         char name[256];
         strcpy(name, filename);
         strcat(name, ".spv");
+        if(!std::filesystem::exists(name))
+        {
+            std::string str = std::string("Couldn't find file ") + name;
+            RHI::log(RHI::LogLevel::Error, str);
+            return VK_ERROR_UNKNOWN;
+        }
         std::vector<char> buffer;
         std::ifstream file(name, std::ios::binary | std::ios::ate);
         std::streamsize size = file.tellg();
@@ -671,7 +679,7 @@ namespace RHI
         {
             if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
             {
-                VkDescriptorSetLayoutCreateInfo layoutInfo;
+                VkDescriptorSetLayoutCreateInfo layoutInfo{};
                 if(desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::ConstantBufferDynamic
                 && desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
                 {
@@ -717,7 +725,7 @@ namespace RHI
             }
             else if(desc->rootParameters[i].type == RootParameterType::DescriptorTable)
             {
-                VkDescriptorSetLayoutCreateInfo layoutInfo;
+                VkDescriptorSetLayoutCreateInfo layoutInfo{};
                 VkDescriptorSetLayoutBinding LayoutBinding[20] = {};
                 for (uint32_t j = 0; j < desc->rootParameters[i].descriptorTable.numDescriptorRanges; j++)
                 {

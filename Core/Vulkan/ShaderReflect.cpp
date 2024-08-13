@@ -1,4 +1,5 @@
 #include "FormatsAndTypes.h"
+#include "Instance.h"
 #include "Ptr.h"
 #include "RootSignature.h"
 #include "pch.h"
@@ -8,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <fstream>
 #include <limits>
 #include <optional>
@@ -238,6 +240,8 @@ namespace RHI
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>
 	{
+		auto str = std::format("There are {0} reflections", refl.size());
+		RHI::log(LogLevel::Info, str);
 		using enum RootParameterType;
 		assert(DifferentStages(refl) && "Cannot Have Two shaders for the same stage");
 		RootSignatureDesc rsDesc;

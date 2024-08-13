@@ -4,7 +4,7 @@
 namespace RHI
 {
     
-    Ptr<vInstance> vInstance::current = nullptr;
+    vInstance* vInstance::current = nullptr;
     void log(LogLevel lvl, std::string_view msg)
     {
         if(vInstance::current->logCallback)

@@ -1,5 +1,4 @@
 project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
-
 cmake = import('cmake')
 
 glfw3 = cmake.subproject('glfw')
