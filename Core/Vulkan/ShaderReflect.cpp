@@ -188,7 +188,7 @@ namespace RHI
 	}
 	static bool DifferentStages(std::span<Ptr<ShaderReflection>> refl)
 	{
-		RHI::ShaderStage stage;
+		RHI::ShaderStage stage = RHI::ShaderStage::None;
 		for(auto ptr : refl)
 		{
 			if((stage & ptr->GetStage()) != RHI::ShaderStage::None) return false;
@@ -240,8 +240,6 @@ namespace RHI
 			std::vector<RootParameterDesc>,
 			std::vector<std::vector<DescriptorRange>>>
 	{
-		auto str = std::format("There are {0} reflections", refl.size());
-		RHI::log(LogLevel::Info, str);
 		using enum RootParameterType;
 		assert(DifferentStages(refl) && "Cannot Have Two shaders for the same stage");
 		RootSignatureDesc rsDesc;
