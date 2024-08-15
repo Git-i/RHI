@@ -15,6 +15,7 @@ namespace RHI {
 		*refCnt -= 1;
 		if (*refCnt <= 0) {
 			delete name;
+			delete refCnt;
 			delete this;
 			return 0;
 		}

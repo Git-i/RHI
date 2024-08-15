@@ -423,13 +423,16 @@ namespace RHI
         if (desc.poolSizes->type == DescriptorType::RTV || desc.poolSizes->type == DescriptorType::DSV)
         {
             vdescriptorHeap->ID = new VkImageView[desc.poolSizes->numDescriptors];
+            vdescriptorHeap->type = RHI::DescriptorType::RTV;//this is purely for correct deletion
         }
         else if (desc.poolSizes->type == DescriptorType::Sampler)
         {
             vdescriptorHeap->ID = new VkSampler[desc.poolSizes->numDescriptors];
+            vdescriptorHeap->type = RHI::DescriptorType::RTV;
         }
         else
         {
+            vdescriptorHeap->type = RHI::DescriptorType::ConstantBuffer;//again this is not supposed to be correct
             VkDescriptorPoolSize poolSize[5]{};
             for (uint32_t i = 0; i < desc.numPoolSizes; i++)
             {
