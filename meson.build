@@ -62,3 +62,4 @@ endif
 lib = library('RHI', vulkan_src, include_directories: inc, dependencies: deps, 
 override_options : ['cpp_std=c++20'])
 rhi_dep = declare_dependency(include_directories: inc, link_with: lib, dependencies: deps)
+meson.override_dependency('pistachio_rhi', rhi_dep)
