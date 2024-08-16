@@ -46,7 +46,7 @@ extern "C"
 		volkInitialize();
 		VkValidationFeatureEnableEXT enabled[] =
 		{
-			//VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+			VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
 		};
 		VkValidationFeaturesEXT features{};
 		features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
