@@ -1,6 +1,6 @@
 project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
 
-glfw3 _dep= dependency('glfw3')
+glfw3_dep= dependency('glfw3')
 
 inc_list = [
     '.','Core/'
