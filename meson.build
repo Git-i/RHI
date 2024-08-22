@@ -1,8 +1,6 @@
 project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
-cmake = import('cmake')
 
-glfw3 = cmake.subproject('glfw')
-glfw3_dep = glfw3.dependency('glfw')
+glfw3 _dep= dependency('glfw3')
 
 inc_list = [
     '.','Core/'
