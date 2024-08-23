@@ -390,7 +390,9 @@ namespace RHI
 		OutOfDeviceMemory = 2,
 		InvalidParameters = 3,
 		FragmentedHeap = 4,
-		OutOfHeapMemory = 5
+		OutOfHeapMemory = 5,
+		FileNotFound,
+		IncompatibleShader
 	};
 	template<typename T>
 	using creation_result = ezr::result<Ptr<T>, CreationError>;

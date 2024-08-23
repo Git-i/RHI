@@ -17,6 +17,8 @@
 #include "VulkanSpecific.h"
 #include "result.hpp"
 #include "volk.h"
+#include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -234,50 +236,50 @@ namespace RHI
     }
     Default_t Default = {};
     Zero_t Zero = {};
-    static VkResult CreateShaderModule(const char* filename, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage,int index, VkShaderModule* module,Internal_ID device)
+    static CreationError CreateShaderModule(const char* filename, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage,int index, VkShaderModule* module,Internal_ID device)
     {
-        char name[256];
-        strcpy(name, filename);
-        strcat(name, ".spv");
-        if(!std::filesystem::exists(name))
+        if(!std::filesystem::exists(filename))
         {
-            std::string str = std::string("Couldn't find file ") + name;
-            RHI::log(RHI::LogLevel::Error, str);
-            return VK_ERROR_UNKNOWN;
+            return CreationError::FileNotFound;
         }
         std::vector<char> buffer;
-        std::ifstream file(name, std::ios::binary | std::ios::ate);
-        std::streamsize size = file.tellg();
-        buffer.resize(size);
-        file.seekg(0, std::ios::beg);
-        file.read(buffer.data(), size);
+        std::ifstream file(filename, std::ios::binary);
+        uint32_t spvSize;
+        file.read((char*)&spvSize, 4);
+        std::span size_bytes = std::as_writable_bytes(std::span{&spvSize, 1});
+        if(std::endian::native != std::endian::little) std::reverse(size_bytes.begin(), size_bytes.end());
+        if(spvSize == 0) return CreationError::IncompatibleShader;
+        buffer.resize(spvSize);
+        file.read(buffer.data(), spvSize);
 
         VkShaderModuleCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         info.codeSize = buffer.size();
         info.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
-        vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
+        auto res = vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
+        if(res < VK_SUCCESS) return marshall_error(res);
         auto& vertShaderStageInfo = shader_info[index];
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         vertShaderStageInfo.stage = stage;
         vertShaderStageInfo.module = module[index];
         vertShaderStageInfo.pName = "main";
 
-        return VK_SUCCESS;
+        return CreationError::None;
     }
-    static VkResult CreateShaderModule(const char* memory, uint32_t size, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage, int index, VkShaderModule* module, Internal_ID device)
+    static CreationError CreateShaderModule(const char* memory, uint32_t size, VkPipelineShaderStageCreateInfo* shader_info, VkShaderStageFlagBits stage, int index, VkShaderModule* module, Internal_ID device)
     {
         VkShaderModuleCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         info.codeSize = size;
         info.pCode = reinterpret_cast<const uint32_t*>(memory);
-        vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
+        auto res = vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
+        if(res < VK_SUCCESS) return marshall_error(res);
         auto& vertShaderStageInfo = shader_info[index];
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         vertShaderStageInfo.stage = stage;
         vertShaderStageInfo.module = module[index];
         vertShaderStageInfo.pName = "main";
-        return VK_SUCCESS;
+        return CreationError::None;
     }
     VkExternalMemoryHandleTypeFlagBitsKHR MemFlags(ExportOptions opt)
     {
@@ -861,48 +863,41 @@ namespace RHI
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
         int index = 0;
-        if (desc.VS.data)
-        {
-            if(desc.shaderMode == File)
-                CreateShaderModule(desc.VS.data, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
-            else
-                CreateShaderModule(desc.VS.data,desc.VS.size, ShaderpipelineInfo, VK_SHADER_STAGE_VERTEX_BIT, index, modules, ID);
+        auto createShader = [&](const ShaderCode& code, VkShaderStageFlagBits bits){
+            CreationError err = CreationError::None;
+            if(code.data)
+            {
+                if(desc.shaderMode == File) err = CreateShaderModule(code.data, ShaderpipelineInfo, bits, index, modules, ID);
+                else err = CreateShaderModule(desc.VS.data, desc.VS.size, ShaderpipelineInfo, bits, index, modules, ID);
+                index++;
+            }
+            return err;
+        };
+        auto cleanShaders = [&](CreationError err) {
+            if(err == CreationError::None) return false;
+            for(auto module: std::span{modules, (size_t)index})
+            {
+                vkDestroyShaderModule((VkDevice)ID, module, nullptr);
+            }
+            return true;
+        };
+        CreationError err = CreationError::None;
 
-            index++;
-        }
-        if (desc.PS.data)
-        {
-            if (desc.shaderMode == File)
-                CreateShaderModule(desc.PS.data, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
-            else
-                CreateShaderModule(desc.PS.data, desc.PS.size, ShaderpipelineInfo, VK_SHADER_STAGE_FRAGMENT_BIT, index, modules, ID);
-            index++;
-        }
-        if (desc.GS.data)
-        {
-            if(desc.shaderMode == File)
-                CreateShaderModule(desc.GS.data, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
-            else
-                CreateShaderModule(desc.GS.data, desc.GS.size, ShaderpipelineInfo, VK_SHADER_STAGE_GEOMETRY_BIT, index, modules, ID);
-            index++;
-        }
-        if (desc.HS.data)
-        {
-            if (desc.shaderMode == File)
-                CreateShaderModule(desc.HS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
-            else
-                CreateShaderModule(desc.HS.data,desc.HS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, index,modules,ID);
-            index++;
-        }
-        if (desc.DS.data)
-        {
-            if (desc.shaderMode == File)
-                CreateShaderModule(desc.DS.data, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
-            else
-                CreateShaderModule(desc.DS.data,desc.DS.size, ShaderpipelineInfo, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, index,modules, ID);
+        err = createShader(desc.VS, VK_SHADER_STAGE_VERTEX_BIT);
+        if(cleanShaders(err)) return ezr::err(err);
 
-            index++;
-        }
+        err = createShader(desc.PS, VK_SHADER_STAGE_FRAGMENT_BIT);
+        if(cleanShaders(err)) return ezr::err(err);
+
+        err = createShader(desc.GS, VK_SHADER_STAGE_GEOMETRY_BIT);
+        if(cleanShaders(err)) return ezr::err(err);
+
+        err = createShader(desc.HS, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+        if(cleanShaders(err)) return ezr::err(err);
+
+        err = createShader(desc.DS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+        if(cleanShaders(err)) return ezr::err(err);
+        
         VkVertexInputAttributeDescription inputAttribDesc[5];
         VkVertexInputBindingDescription inputbindingDesc[5];
         for (uint32_t i = 0; i < desc.numInputElements ; i++)
