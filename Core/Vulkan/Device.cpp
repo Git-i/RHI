@@ -865,10 +865,10 @@ namespace RHI
         int index = 0;
         auto createShader = [&](const ShaderCode& code, VkShaderStageFlagBits bits){
             CreationError err = CreationError::None;
-            if(code.data)
+            if(code.data.size())
             {
-                if(desc.shaderMode == File) err = CreateShaderModule(code.data, ShaderpipelineInfo, bits, index, modules, ID);
-                else err = CreateShaderModule(desc.VS.data, desc.VS.size, ShaderpipelineInfo, bits, index, modules, ID);
+                if(desc.shaderMode == File) err = CreateShaderModule(std::string(code.data).c_str(), ShaderpipelineInfo, bits, index, modules, ID);
+                else err = CreateShaderModule(code.data.data(), code.data.size(), ShaderpipelineInfo, bits, index, modules, ID);
                 index++;
             }
             return err;
@@ -1410,8 +1410,8 @@ namespace RHI
         VkComputePipelineCreateInfo info{};
         info.layout = (VkPipelineLayout)desc.rootSig->ID;
         VkShaderModule module;
-        if (desc.mode == ShaderMode::File) CreateShaderModule(desc.CS.data, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
-        else CreateShaderModule(desc.CS.data, desc.CS.size, &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
+        if (desc.mode == ShaderMode::File) CreateShaderModule(std::string(desc.CS.data).c_str(), &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
+        else CreateShaderModule(desc.CS.data.data(), desc.CS.data.size(), &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
         VkResult res = vkCreateComputePipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &info, nullptr, (VkPipeline*)&vpipeline->ID);
 
