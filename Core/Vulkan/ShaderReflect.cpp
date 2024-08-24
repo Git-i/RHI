@@ -6,12 +6,12 @@
 #include "VulkanSpecific.h"
 #include "../ShaderReflect.h"
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <format>
+#include <filesystem>
 #include <fstream>
-#include <limits>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -27,30 +27,33 @@ namespace RHI
 	{
 		return static_cast<size_t>(x);
 	}
-	creation_result<ShaderReflection> ShaderReflection::CreateFromFile(const char* filename)
+	creation_result<ShaderReflection> ShaderReflection::CreateFromFile(std::string_view filename)
 	{
 		Ptr<vShaderReflection> vReflection(new vShaderReflection);
+		if(!std::filesystem::exists(filename)) return ezr::err(CreationError::FileNotFound);
+		std::ifstream file(std::string(filename), std::ios::binary);
+		uint32_t spvSize = 0;
+		file.read((char*)&spvSize, 4);
+		
+		std::span bytes = std::as_writable_bytes(std::span{&spvSize, 1});
+		if(std::endian::native != std::endian::little) std::reverse(bytes.begin(), bytes.end());
+		if(spvSize == 0) return ezr::err(CreationError::IncompatibleShader);
+		
+		std::vector<char> buffer(spvSize);
+		file.read(buffer.data(), spvSize);
+
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
-		char actual_name[1024];
-		strcpy(actual_name, filename);
-		strcat(actual_name, ".spv");
-		std::ifstream file(actual_name, std::ios::ate | std::ios::binary);
-		size_t fileSize = (size_t)file.tellg();
-		std::vector<char> buffer(fileSize);
-		file.seekg(0);
-		file.read(buffer.data(), fileSize);
-		file.close();
 		SpvReflectResult result = spvReflectCreateShaderModule(buffer.size(), buffer.data(), module);
 		//TODO
 		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
-	creation_result<ShaderReflection> ShaderReflection::CreateFromMemory(const char* buffer, uint32_t size)
+	creation_result<ShaderReflection> ShaderReflection::CreateFromMemory(std::string_view buffer)
 	{
 		Ptr<vShaderReflection> vReflection(new vShaderReflection);
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
-		SpvReflectResult result = spvReflectCreateShaderModule(size, buffer, module);
+		SpvReflectResult result = spvReflectCreateShaderModule(buffer.size(), buffer.data(), module);
 
 		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}

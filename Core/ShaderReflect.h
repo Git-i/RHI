@@ -1,14 +1,12 @@
 #pragma once
-#include "DescriptorHeap.h"
 #include "Object.h"
 #include "FormatsAndTypes.h"
 #include "RootSignature.h"
-#include "result.hpp"
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <initializer_list>
 #include <string>
+#include <string_view>
 namespace RHI
 {
 	struct SRDescriptorBinding
@@ -43,8 +41,8 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(ShaderReflection)
 	public:
-		static creation_result<ShaderReflection> CreateFromFile(const char* filename);
-		static creation_result<ShaderReflection> CreateFromMemory(const char* buffer,uint32_t size);
+		static creation_result<ShaderReflection> CreateFromFile(std::string_view filename);
+		static creation_result<ShaderReflection> CreateFromMemory(std::string_view buffer);
 		static auto FillRootSignatureDesc(std::span<RHI::Ptr<ShaderReflection>>, std::span<const uint32_t> dynamic_sets, std::optional<uint32_t> push_block_idx) -> std::tuple<
 			RootSignatureDesc,
 			std::vector<RootParameterDesc>,

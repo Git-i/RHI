@@ -2,6 +2,7 @@
 #include "Core.h"
 #include "Ptr.h"
 #include "result.hpp"
+#include <string_view>
 #include <vector>
 
 namespace RHI
@@ -171,11 +172,7 @@ namespace RHI
 	};
 	struct ShaderCode
 	{
-		union{
-			const char* data = nullptr;
-			char* mut_data;
-		};
-		uint32_t size = 0;
+		std::string_view data;
 	};
 	enum class API
 	{
