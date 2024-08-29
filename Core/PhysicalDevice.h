@@ -9,7 +9,7 @@ namespace RHI
 	};
 	enum class DeviceType
 	{
-		Integrated, Dedicated, CPU
+		Unknown, Integrated, Dedicated, CPU
 	};
 	struct PhysicalDeviceDesc
 	{

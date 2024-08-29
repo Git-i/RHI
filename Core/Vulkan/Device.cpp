@@ -58,8 +58,9 @@ static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 namespace RHI
 {
     ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-    Device::Create(PhysicalDevice* PhysicalDevice,CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance, DeviceCreateFlags flags)
+    Device::Create(PhysicalDevice* PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, Internal_ID instance, DeviceCreateFlags flags)
     {
+        uint32_t numCommandQueues = commandQueueInfos.size();
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
         VkPhysicalDeviceMemoryProperties memProps;
         Ptr<vDevice> vdevice(new RHI::vDevice);
@@ -85,19 +86,19 @@ namespace RHI
 
         std::unordered_map<uint32_t, VkDeviceQueueCreateInfo> queueInfos;
         std::unordered_map<uint32_t, std::vector<float>> priorities;
-        for (int i = 0; i < numCommandQueues; i++)
+        for (auto& qi:commandQueueInfos)
         {
             std::uint32_t index = 0;
-            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
-            else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
-            else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
+            if (qi.commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
+            else if (qi.commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
+            else if (qi.commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
             else return ezr::err(CreationError::CommandQueueNotAvailable);
             if (qcounts[index] <= usedQueues[index])
             {
                 RHI::log(LogLevel::Error, std::format("Attempted to Create Too Many Queues of type {0}", [&]{
-                    if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) return "Graphics";
-                    else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) return "Compute";
-                    else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) return "Copy";
+                    if (qi.commandListType == RHI::CommandListType::Direct) return "Graphics";
+                    else if (qi.commandListType == RHI::CommandListType::Compute) return "Compute";
+                    else if (qi.commandListType == RHI::CommandListType::Copy) return "Copy";
                     else return "Unkown";
                 }()));
                 return ezr::err(CreationError::CommandQueueNotAvailable);
@@ -105,12 +106,12 @@ namespace RHI
 
             auto& qInfo = queueInfos[index];
             auto& queuePriority = priorities[index];
-            queuePriority.push_back(commandQueueInfos[i].Priority);
+            queuePriority.push_back(qi.Priority);
 
             qInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             qInfo.pNext = NULL;
             qInfo.pQueuePriorities = queuePriority.data();
-            commandQueueInfos[i]._unused = usedQueues[index]++;
+            qi._unused = usedQueues[index]++;
             qInfo.queueCount = usedQueues[index];
             qInfo.queueFamilyIndex = index;
             qInfo.flags = 0;
@@ -169,7 +170,7 @@ namespace RHI
             return ezr::err(marshall_error(res));
         }
         vqueue.reserve(numCommandQueues);
-        for (int i = 0; i < numCommandQueues; i++)
+        for (uint32_t i = 0; i < numCommandQueues; i++)
         {
             vqueue.emplace_back(new vCommandQueue);
             uint32_t index = 0;

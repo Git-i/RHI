@@ -1,9 +1,7 @@
 #include "FormatsAndTypes.h"
-#include "pch.h"
 #include "../PhysicalDevice.h"
 #include "VulkanSpecific.h"
 #include <cstdint>
-#include <string>
 #include <unordered_map>
 #include <vulkan/vulkan_core.h>
 namespace RHI
@@ -22,6 +20,7 @@ namespace RHI
 			case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return Integrated;
 			case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return Dedicated;
 			case VK_PHYSICAL_DEVICE_TYPE_CPU: return CPU;
+			default: return Unknown;
 		}
 	}
     PhysicalDeviceDesc PhysicalDevice::GetDesc()

@@ -7,12 +7,20 @@
 #include <cstdint>
 namespace RHI
 {
+	enum class SwapChainError
+	{
+		None,
+		OutOfDate,
+		OutOfMemory,
+		DeviceLost,
+		Unknown
+	};
 	class RHI_API SwapChain : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(SwapChain);
 	public:
-		RESULT Present(RHI::Weak<RHI::Fence> waitBeforePresent, uint64_t waitVal);
+		[[nodiscard]] SwapChainError Present(RHI::Weak<RHI::Fence> waitBeforePresent, uint64_t waitVal);
 		uint32_t GetImageIndex();
 	};
 	struct RHI_API SwapChainDesc

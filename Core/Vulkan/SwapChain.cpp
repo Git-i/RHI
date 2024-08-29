@@ -1,3 +1,4 @@
+#include "Core.h"
 #include "pch.h"
 #include "../SwapChain.h"
 #include "volk.h"
@@ -7,6 +8,18 @@
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
+	SwapChainError marshall_swap_error(VkResult r)
+	{
+		switch (r) 
+		{
+			using enum SwapChainError;
+			case VK_ERROR_OUT_OF_DATE_KHR: return OutOfDate;
+			case VK_ERROR_OUT_OF_DEVICE_MEMORY: [[fallthrough]];
+			case VK_ERROR_OUT_OF_HOST_MEMORY: return OutOfMemory;
+			case VK_ERROR_DEVICE_LOST: return DeviceLost;
+			default: return Unknown;
+		}
+	}
 	SwapChainDesc::SwapChainDesc(Default_t)
 	{
 		RefreshRate = { 60, 1 };
@@ -31,8 +44,9 @@ namespace RHI
 	Wait for the previous acquired image to be ready and for the passed Fence to be completed
 	Present and acquire the next image to be presented
 	*/
-	RESULT SwapChain::Present(Weak<Fence> wait, uint64_t val)
+	SwapChainError SwapChain::Present(Weak<Fence> wait, uint64_t val)
 	{
+		VkResult res;
 		auto vchain = ((vSwapChain*)this);
 		auto dev = (VkDevice)(device.retrieve_as_forced<vDevice>())->ID;
 		VkTimelineSemaphoreSubmitInfo timelineInfo{};
@@ -47,8 +61,8 @@ namespace RHI
 		VkPipelineStageFlags fg = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		submitInfo.pWaitDstStageMask = &fg;
 		submitInfo.pWaitSemaphores = (VkSemaphore*)&wait->ID;
-		vkQueueSubmit(vchain->PresentQueue_ID, 1, &submitInfo, VK_NULL_HANDLE);
-
+		res = vkQueueSubmit(vchain->PresentQueue_ID, 1, &submitInfo, VK_NULL_HANDLE);
+		if(res != VK_SUCCESS) return marshall_swap_error(res);
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.pNext = nullptr;
@@ -58,12 +72,19 @@ namespace RHI
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapChains;
 		presentInfo.pImageIndices = &vchain->imgIndex;
-		vkWaitForFences(dev, 1, &vchain->imageAcquired, true, UINT64_MAX);
+		
+		res = vkWaitForFences(dev, 1, &vchain->imageAcquired, true, UINT64_MAX);
+		if(res != VK_SUCCESS) return marshall_swap_error(res);
+		
+		res = vkQueuePresentKHR(((vSwapChain*)this)->PresentQueue_ID, &presentInfo);
+		if(res != VK_SUCCESS) return marshall_swap_error(res);
+		
+		res = vkResetFences(dev, 1, &vchain->imageAcquired);
+		if(res != VK_SUCCESS) return marshall_swap_error(res);
 
-		vkQueuePresentKHR(((vSwapChain*)this)->PresentQueue_ID, &presentInfo);
-		vkResetFences(dev, 1, &vchain->imageAcquired);
-		vkAcquireNextImageKHR(dev, (VkSwapchainKHR)ID, UINT64_MAX, VK_NULL_HANDLE, vchain->imageAcquired, &vchain->imgIndex);
-		return RESULT();
+		res = vkAcquireNextImageKHR(dev, (VkSwapchainKHR)ID, UINT64_MAX, VK_NULL_HANDLE, vchain->imageAcquired, &vchain->imgIndex);
+		if(res != VK_SUCCESS) return marshall_swap_error(res);
+		return SwapChainError::None;
 	}
 	uint32_t SwapChain::GetImageIndex()
 	{

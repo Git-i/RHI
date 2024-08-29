@@ -188,8 +188,6 @@ namespace RHI
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 		VkResult res = vkCreateSwapchainKHR((VkDevice)Device->ID, &createInfo, nullptr, (VkSwapchainKHR*)&vswapChain->ID);
 		if(res < 0) return ezr::err(marshall_error(res));
-		VkSemaphoreCreateInfo semaphoreInfo{};
-		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 		VkFenceCreateInfo finfo{};
 		finfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		finfo.flags = 0;
