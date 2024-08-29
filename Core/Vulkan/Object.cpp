@@ -15,7 +15,9 @@ namespace RHI {
 		*refCnt -= 1;
 		if (*refCnt <= 0) {
 			delete name;
+			name = nullptr;
 			delete refCnt;
+			refCnt = nullptr;
 			delete this;
 			return 0;
 		}
@@ -23,7 +25,8 @@ namespace RHI {
 	}
 	int Object::GetRefCount()
 	{
-		return *refCnt;
+		if(refCnt) return *refCnt;
+		return 0;
 	}
 	void Object::SetName(const char* obj_name)
 	{
