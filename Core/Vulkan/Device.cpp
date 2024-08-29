@@ -21,8 +21,10 @@
 #include <bit>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <memory>
 #include <ranges>
+#include <unordered_map>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
@@ -56,10 +58,9 @@ static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 namespace RHI
 {
     ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-    Device::Create(PhysicalDevice* PhysicalDevice,CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance,bool* MQ, DeviceCreateFlags flags)
+    Device::Create(PhysicalDevice* PhysicalDevice,CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance, DeviceCreateFlags flags)
     {
         VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
-        if(MQ)*MQ = true;
         VkPhysicalDeviceMemoryProperties memProps;
         Ptr<vDevice> vdevice(new RHI::vDevice);
         std::vector<Ptr<CommandQueue>> vqueue;
@@ -82,30 +83,37 @@ namespace RHI
         vdevice->indices = qfamilies;
         std::vector<uint32_t> usedQueues(qcounts.size(), 0);
 
-        std::vector<VkDeviceQueueCreateInfo> queueInfos;
-        queueInfos.reserve(numCommandQueues);
+        std::unordered_map<uint32_t, VkDeviceQueueCreateInfo> queueInfos;
+        std::unordered_map<uint32_t, std::vector<float>> priorities;
         for (int i = 0; i < numCommandQueues; i++)
         {
-            VkDeviceQueueCreateInfo qInfo;
-            qInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            qInfo.pNext = NULL;
-            float queuePriority = commandQueueInfos[i].Priority;
-            qInfo.pQueuePriorities = &queuePriority;
             std::uint32_t index = 0;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
-            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
-            if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
+            else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
+            else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
+            else return ezr::err(CreationError::CommandQueueNotAvailable);
             if (qcounts[index] <= usedQueues[index])
             {
-                commandQueueInfos[i]._unused = usedQueues[index] - 1;
-                if (MQ)*MQ = false;
-                continue;
+                RHI::log(LogLevel::Error, std::format("Attempted to Create Too Many Queues of type {0}", [&]{
+                    if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) return "Graphics";
+                    else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) return "Compute";
+                    else if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) return "Copy";
+                    else return "Unkown";
+                }()));
+                return ezr::err(CreationError::CommandQueueNotAvailable);
             }
+
+            auto& qInfo = queueInfos[index];
+            auto& queuePriority = priorities[index];
+            queuePriority.push_back(commandQueueInfos[i].Priority);
+
+            qInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            qInfo.pNext = NULL;
+            qInfo.pQueuePriorities = queuePriority.data();
             commandQueueInfos[i]._unused = usedQueues[index]++;
-            qInfo.queueCount = 1;
+            qInfo.queueCount = usedQueues[index];
             qInfo.queueFamilyIndex = index;
             qInfo.flags = 0;
-            queueInfos.push_back(qInfo);
         }
         if (vdevice->indices.graphicsIndex != vdevice->indices.presentIndex)
         {
@@ -116,8 +124,10 @@ namespace RHI
             info.queueCount = 1;
             info.queueFamilyIndex = vdevice->indices.presentIndex;
             info.flags = 0;
-            queueInfos.push_back(info);
+            queueInfos[vdevice->indices.presentIndex] = info;
         }
+        std::vector<VkDeviceQueueCreateInfo> queueInfo_vec(queueInfos.size());
+        std::ranges::copy(std::ranges::views::values(queueInfos), queueInfo_vec.begin());
         VkPhysicalDeviceFeatures deviceFeatures{};
         //deviceFeatures.shaderStorageImageReadWithoutFormat = VK_TRUE;
         VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
@@ -132,8 +142,8 @@ namespace RHI
         VkDeviceCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         info.pNext = &semaphoreFeatures;
-        info.pQueueCreateInfos = queueInfos.data();
-        info.queueCreateInfoCount = queueInfos.size();
+        info.pQueueCreateInfos = queueInfo_vec.data();
+        info.queueCreateInfoCount = queueInfo_vec.size();
         info.pEnabledFeatures = &deviceFeatures;
         const char* ext_name[] =
         {

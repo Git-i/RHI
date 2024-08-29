@@ -4,6 +4,7 @@
 #include "FormatsAndTypes.h"
 #include "Surface.h"
 #include "Texture.h"
+#include <cstdint>
 namespace RHI
 {
 	class RHI_API SwapChain : public Object
@@ -12,7 +13,7 @@ namespace RHI
 		DECL_CLASS_CONSTRUCTORS(SwapChain);
 	public:
 		RESULT Present(RHI::Weak<RHI::Fence> waitBeforePresent, uint64_t waitVal);
-
+		uint32_t GetImageIndex();
 	};
 	struct RHI_API SwapChainDesc
 	{

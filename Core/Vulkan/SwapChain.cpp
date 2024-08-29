@@ -65,4 +65,8 @@ namespace RHI
 		vkAcquireNextImageKHR(dev, (VkSwapchainKHR)ID, UINT64_MAX, VK_NULL_HANDLE, vchain->imageAcquired, &vchain->imgIndex);
 		return RESULT();
 	}
+	uint32_t SwapChain::GetImageIndex()
+	{
+		return ((vSwapChain*)this)->imgIndex;
+	}
 }

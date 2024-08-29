@@ -1,7 +1,10 @@
+#include "FormatsAndTypes.h"
 #include "pch.h"
 #include "../PhysicalDevice.h"
 #include "VulkanSpecific.h"
+#include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
@@ -35,4 +38,39 @@ namespace RHI
 		returnVal.type =ToRHIType( result.properties.deviceType);
 		return returnVal;
     }
+	QueueInfo PhysicalDevice::GetQueueInfo()
+	{
+		auto[family, count] = findQueueFamilyIndices(this);
+		std::unordered_map<uint32_t, uint32_t> family_to_count_index;
+		QueueInfo info;
+		uint32_t next_count_index = 0;
+		if(family.flags & HasGraphics)
+		{
+			info.graphicsSupported = true;
+			info.gfxCountIndex = next_count_index;
+			info.counts[next_count_index] = count[family.graphicsIndex];
+			family_to_count_index[family.graphicsIndex] = next_count_index++;
+			
+		}
+		if(family.flags & HasCompute)
+		{
+			info.computeSupported = true;
+			uint32_t ci;
+			if(family_to_count_index.contains(family.computeIndex)) ci = family_to_count_index[family.computeIndex];
+			else ci = next_count_index++;
+			info.counts[ci] = count[family.computeIndex];
+			info.cmpCountIndex = ci;
+			family_to_count_index[family.computeIndex] = ci;
+		}
+		if(family.flags & HasCopy)
+		{
+			info.copySupported = true;
+			uint32_t ci;
+			if(family_to_count_index.contains(family.copyIndex)) ci = family_to_count_index[family.copyIndex];
+			else ci = next_count_index++;
+			info.counts[ci] = count[family.copyIndex];
+			info.copyCountIndex = ci;
+		}
+		return info;
+	}
 }

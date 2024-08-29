@@ -70,7 +70,7 @@ namespace RHI
 		RHI::Texture* WrapNativeTexture(Internal_ID id);
 		~Device(){}
 		static ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-	       Create(RHI::PhysicalDevice* PhysicalDevice, RHI::CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance,bool*MQ = nullptr, RHI::DeviceCreateFlags flags = RHI::DeviceCreateFlags::None);
+	       Create(RHI::PhysicalDevice* PhysicalDevice, RHI::CommandQueueDesc* commandQueueInfos, int numCommandQueues, Internal_ID instance, RHI::DeviceCreateFlags flags = RHI::DeviceCreateFlags::None);
 	};
 	const RESULT& vkCompareFunc();
 }

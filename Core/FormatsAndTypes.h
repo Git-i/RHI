@@ -389,7 +389,8 @@ namespace RHI
 		FragmentedHeap = 4,
 		OutOfHeapMemory = 5,
 		FileNotFound,
-		IncompatibleShader
+		IncompatibleShader,
+		CommandQueueNotAvailable
 	};
 	template<typename T>
 	using creation_result = ezr::result<Ptr<T>, CreationError>;
