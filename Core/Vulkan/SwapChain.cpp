@@ -17,6 +17,7 @@ namespace RHI
 			case VK_ERROR_OUT_OF_DEVICE_MEMORY: [[fallthrough]];
 			case VK_ERROR_OUT_OF_HOST_MEMORY: return OutOfMemory;
 			case VK_ERROR_DEVICE_LOST: return DeviceLost;
+			case VK_SUBOPTIMAL_KHR: return SubOptimal;
 			default: return Unknown;
 		}
 	}

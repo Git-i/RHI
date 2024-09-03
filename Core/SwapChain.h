@@ -13,6 +13,7 @@ namespace RHI
 		OutOfDate,
 		OutOfMemory,
 		DeviceLost,
+		SubOptimal,
 		Unknown
 	};
 	class RHI_API SwapChain : public Object
