@@ -1,4 +1,5 @@
 #pragma once
+#include "FormatsAndTypes.h"
 #include "Object.h"
 #include <array>
 namespace RHI
@@ -38,12 +39,28 @@ namespace RHI
 		uint32_t cmpCountIndex;
 		uint32_t copyCountIndex;
 	};
+	enum class FormatSupport : uint32_t
+	{
+		None = 0,
+		Supported = 1,
+		VertexBuffer = 1 << 1,
+		BlitSrc = 1 << 2,
+		BlitDst = 1 << 3,
+		ColorAttachment = 1 << 4,
+		BlendableColorAttachment = 1 << 5,
+		DepthStencilAttachment = 1 << 6,
+		SampledImage = 1 << 7,
+		StorageImage = 1 << 8,
+	};
+	DEFINE_ENUM_FLAG_OPERATORS(FormatSupport);
 	class RHI_API PhysicalDevice
 	{
 	public:
 		static RHI::PhysicalDevice* FromNativeHandle(Internal_ID id);
 		QueueInfo GetQueueInfo();
 		PhysicalDeviceDesc GetDesc();
+		FormatSupport GetFormatSupportInfo(RHI::Format format, TextureTilingMode t);
+		FormatSupport GetBufferFormatSupportInfo(RHI::Format format);
 		Internal_ID ID;
 	};
 

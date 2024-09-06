@@ -191,6 +191,14 @@ namespace RHI
 		float depth;
 		std::uint8_t stecnil;
 	};
+	enum class TextureType
+	{
+		Texture1D, Texture2D, Texture3D
+	};
+	enum class TextureTilingMode
+	{
+		Linear, Optimal
+	};
 	struct ClearValue
 	{
 		Format format;

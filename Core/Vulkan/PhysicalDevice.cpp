@@ -23,6 +23,37 @@ namespace RHI
 			default: return Unknown;
 		}
 	}
+	FormatSupport ToRHIType(VkFormatFeatureFlags vk_props)
+	{
+		using enum FormatSupport;
+		FormatSupport support = None;
+		if(vk_props) support |= Supported; else return support;
+		if(vk_props & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) support |= VertexBuffer;
+		if(vk_props & VK_FORMAT_FEATURE_BLIT_SRC_BIT) support |= BlitSrc;
+		if(vk_props & VK_FORMAT_FEATURE_BLIT_DST_BIT) support |= BlitDst;
+		if(vk_props & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) support |= ColorAttachment;
+		if(vk_props & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) support |= BlendableColorAttachment;
+		if(vk_props & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) support |= DepthStencilAttachment;
+		if(vk_props & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) support |= SampledImage;
+		if(vk_props & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) support |= StorageImage;
+		return support;
+	}
+	FormatSupport PhysicalDevice::GetFormatSupportInfo(RHI::Format format, TextureTilingMode t)
+	{
+		auto vk = FormatConv(format);
+		if(vk == VK_FORMAT_UNDEFINED) return FormatSupport::None;
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties((VkPhysicalDevice)ID, vk, &props);
+		return ToRHIType(t == TextureTilingMode::Linear ? props.linearTilingFeatures : props.optimalTilingFeatures);
+	}
+	FormatSupport PhysicalDevice::GetBufferFormatSupportInfo(RHI::Format format)
+	{
+		auto vk = FormatConv(format);
+		if(vk == VK_FORMAT_UNDEFINED) return FormatSupport::None;
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties((VkPhysicalDevice)ID, vk, &props);
+		return ToRHIType(props.bufferFeatures);
+	}
     PhysicalDeviceDesc PhysicalDevice::GetDesc()
     {
 		PhysicalDeviceDesc returnVal;
