@@ -146,6 +146,8 @@ namespace RHI
 		INT    = R32_SINT,
 		MAX_COMMON_FORMAT = 200
 	};
+	int FormatToVk(RHI::Format f);
+	RHI::Format FormatFromVk(int vk_format);
 	struct Rational
 	{
 		unsigned int Numerator;

@@ -24,6 +24,7 @@ vulkan_src = [
     'Core/Vulkan/Fence.cpp',
     'Core/Vulkan/Instance.cpp',
     'Core/Vulkan/volk.c',
+    'Core/Common.cpp',
     'Util/Vulkan/FormatUtils.cpp',
     'vendor/spirv_reflect/spirv_reflect.cpp'
 ]
