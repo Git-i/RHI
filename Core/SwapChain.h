@@ -38,9 +38,5 @@ namespace RHI
 		bool Windowed;
 		//DXGI_SWAP_EFFECT SwapEffect;
 		uint32_t Flags;
-
-		SwapChainDesc(Default_t);
-		SwapChainDesc(Zero_t);
-		SwapChainDesc();
 	};
 }

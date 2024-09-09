@@ -45,6 +45,7 @@ namespace RHI
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
 		SpvReflectResult result = spvReflectCreateShaderModule(buffer.size(), buffer.data(), module);
+		if(result != SPV_REFLECT_RESULT_SUCCESS) return ezr::err(RHI::CreationError::Unknown);
 		//TODO
 		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
@@ -54,7 +55,7 @@ namespace RHI
 		auto module = new SpvReflectShaderModule;
 		vReflection->ID = module;
 		SpvReflectResult result = spvReflectCreateShaderModule(buffer.size(), buffer.data(), module);
-
+		if(result != SPV_REFLECT_RESULT_SUCCESS) return ezr::err(RHI::CreationError::Unknown);
 		return ezr::ok(vReflection.transform<ShaderReflection>());
 	}
 	uint32_t ShaderReflection::GetNumDescriptorSets()
@@ -105,15 +106,10 @@ namespace RHI
 		switch (type)
 		{
 		case SPV_REFLECT_RESOURCE_FLAG_SAMPLER: return DescriptorClass::Sampler;
-			break;
 		case SPV_REFLECT_RESOURCE_FLAG_CBV: return DescriptorClass::CBV;
-			break;
 		case SPV_REFLECT_RESOURCE_FLAG_SRV: return DescriptorClass::SRV;
-			break;
 		case SPV_REFLECT_RESOURCE_FLAG_UAV: return DescriptorClass::UAV;
-			break;
-		default:
-			break;
+		default: return DescriptorClass(-1);
 		}
 	}
 	static ShaderStage convertSpvType(SpvReflectShaderStageFlagBits stage)
@@ -157,8 +153,7 @@ namespace RHI
 		}
 		case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE: return DescriptorType::CSTexture;
 			break;
-		default:
-			break;
+		default: return DescriptorType(-1);
 		}
 	}
 	void ShaderReflection::GetDescriptorSetBindings(SRDescriptorSet* set, SRDescriptorBinding* bindings)

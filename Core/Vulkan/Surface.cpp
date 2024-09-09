@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "volk.h"
 #include "../Surface.h"
+#include "VulkanSpecific.h"
 namespace RHI
 {
 	#ifdef WIN32
@@ -20,9 +21,10 @@ namespace RHI
 	//}
 	#endif
 	#ifdef USE_GLFW
-	void RHI::Surface::InitGLFW(GLFWwindow* window, Internal_ID instance)
+	RHI::CreationError RHI::Surface::InitGLFW(GLFWwindow* window, Internal_ID instance)
 	{
 		VkResult res = glfwCreateWindowSurface((VkInstance)instance, window, nullptr, (VkSurfaceKHR*)&ID);
+		return marshall_error(res);
 	}
 	#endif
 }

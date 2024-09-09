@@ -10,7 +10,7 @@ namespace RHI
 	{
 	public:
 #ifdef _WIN32
-		void InitWin32(HWND hwnd, Internal_ID instance);
+		RHI::CreationError InitWin32(HWND hwnd, Internal_ID instance);
 #endif
 
 #ifdef __ANDROID__
@@ -22,7 +22,7 @@ namespace RHI
 #endif
 
 #ifdef USE_GLFW
-		void InitGLFW(GLFWwindow* window, Internal_ID instance);
+		RHI::CreationError InitGLFW(GLFWwindow* window, Internal_ID instance);
 #endif
 		Internal_ID ID = 0;
 	};

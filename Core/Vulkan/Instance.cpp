@@ -33,6 +33,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 	return VK_FALSE;
 }
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(a) \
+  ((sizeof(a) / sizeof(*(a))) / \
+  static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
+#endif
 extern "C"
 {
 	RESULT RHI_API RHICreateInstance(RHI::Instance** instance)

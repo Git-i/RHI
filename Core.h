@@ -67,11 +67,7 @@ inline ENUMTYPE &operator ^= (ENUMTYPE &a, ENUMTYPE b) throw() { return (ENUMTYP
 }
 #endif
 
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(a) \
-  ((sizeof(a) / sizeof(*(a))) / \
-  static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
-#endif
+
 
 #define DECL_STRUCT_CONSTRUCTORS(x) x(){}; x(Default_t); x(Zero_t);
 #define DECL_CLASS_CONSTRUCTORS(x) x() = default;x(const x&) = default;x(x&&) = default;

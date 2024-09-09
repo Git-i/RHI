@@ -33,17 +33,11 @@ namespace RHI
         switch (topology)
         {
         case RHI::PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-            break;
         case RHI::PrimitiveTopology::LineList: return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-            break;
         case RHI::PrimitiveTopology::LineStrip: return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-            break;
         case RHI::PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-            break;
         case RHI::PrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-            break;
-        default:
-            break;
+        default: return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         }
     }
     std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface)
@@ -54,7 +48,7 @@ namespace RHI
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
         vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)device->ID, &queueFamilyCount, queueFamilies.data());
         std::vector<uint32_t> count(queueFamilyCount);
-        for (int i = 0; i < queueFamilyCount; i++)
+        for (uint32_t i = 0; i < queueFamilyCount; i++)
         {
             if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {

@@ -34,7 +34,11 @@
 #include "vk_mem_alloc.h"
 #include <iostream>
 #include <fstream>
-
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(a) \
+  ((sizeof(a) / sizeof(*(a))) / \
+  static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
+#endif
 using namespace ezr;
 static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 {

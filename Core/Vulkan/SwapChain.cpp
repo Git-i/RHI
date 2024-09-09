@@ -21,26 +21,6 @@ namespace RHI
 			default: return Unknown;
 		}
 	}
-	SwapChainDesc::SwapChainDesc(Default_t)
-	{
-		RefreshRate = { 60, 1 };
-		BufferCount = 2;
-		Flags = 0;
-		Width = 0;
-		Height = 0;
-		OutputSurface = Surface();
-		SampleCount = 1;
-		SampleQuality = 0;
-		SwapChainFormat = RHI::Format::R8G8B8A8_UNORM;
-		Windowed = true;
-	}
-	SwapChainDesc::SwapChainDesc(Zero_t)
-	{
-		memset(this, 0,sizeof(SwapChainDesc));
-	}
-	SwapChainDesc::SwapChainDesc()
-	{
-	}
 	/*
 	Wait for the previous acquired image to be ready and for the passed Fence to be completed
 	Present and acquire the next image to be presented
