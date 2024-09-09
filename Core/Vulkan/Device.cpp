@@ -1329,18 +1329,17 @@ namespace RHI
     }
     static VkImageViewType VkViewType(TextureViewType type)
     {
+        using enum TextureViewType;
         switch (type)
         {
-        case RHI::TextureViewType::Texture1D: return VK_IMAGE_VIEW_TYPE_1D;
-            break;
-        case RHI::TextureViewType::Texture2D: return VK_IMAGE_VIEW_TYPE_2D;
-            break;
-        case RHI::TextureViewType::Texture3D: return VK_IMAGE_VIEW_TYPE_3D;
-            break;
-        case RHI::TextureViewType::TextureCube: return VK_IMAGE_VIEW_TYPE_CUBE;
-            break;
+        case Texture1D: return VK_IMAGE_VIEW_TYPE_1D;
+        case Texture2D: return VK_IMAGE_VIEW_TYPE_2D;
+        case Texture3D: return VK_IMAGE_VIEW_TYPE_3D;
+        case TextureCube: return VK_IMAGE_VIEW_TYPE_CUBE;
+        case Texture1DArray: return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+        case Texture2DArray: return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        case TextureCubeArray: return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
         default: return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-            break;
         }
     }
     creation_result<TextureView> Device::CreateTextureView(const TextureViewDesc& desc)
