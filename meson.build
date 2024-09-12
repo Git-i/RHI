@@ -18,6 +18,7 @@ vulkan_src = [
     'Core/Vulkan/CommandAllocator.cpp',
     'Core/Vulkan/PipelineStateObject.cpp',
     'Core/Vulkan/Buffer.cpp',
+    'Core/Vulkan/Texture.cpp',
     'Core/Vulkan/Device.cpp',
     'Core/Vulkan/DescriptorHeap.cpp',
     'Core/Vulkan/DebugBuffer.cpp',
