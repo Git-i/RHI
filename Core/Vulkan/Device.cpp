@@ -684,7 +684,7 @@ namespace RHI
         }
         return flags;
     }
-    creation_result<RootSignature> Device::CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts)
+    creation_result<RootSignature> Device::CreateRootSignature(const RootSignatureDesc& desc, Ptr<DescriptorSetLayout>* pSetLayouts)
     {
         Ptr<vRootSignature> vrootSignature(new vRootSignature);
         std::tuple<VkDescriptorSetLayout, RootParameterType, uint32_t> descriptorSetLayout[20];
@@ -695,13 +695,13 @@ namespace RHI
         //uint32_t minSetIndex = UINT32_MAX;
         uint32_t numLayouts = 0;
         uint32_t pcIndex = 0;
-        for (uint32_t i = 0; i < desc->numRootParameters; i++)
+        for (auto& param : desc.rootParameters)
         {
-            if (desc->rootParameters[i].type == RootParameterType::DynamicDescriptor)
+            if (param.type == RootParameterType::DynamicDescriptor)
             {
                 VkDescriptorSetLayoutCreateInfo layoutInfo{};
-                if(desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::ConstantBufferDynamic
-                && desc->rootParameters[i].dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
+                if(param.dynamicDescriptor.type != DescriptorType::ConstantBufferDynamic
+                && param.dynamicDescriptor.type != DescriptorType::StructuredBufferDynamic)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
@@ -714,9 +714,9 @@ namespace RHI
                 VkDescriptorSetLayoutBinding binding;
                 binding.binding = 0;
                 binding.descriptorCount = 1;
-                binding.descriptorType = DescType(desc->rootParameters[i].dynamicDescriptor.type);
+                binding.descriptorType = DescType(param.dynamicDescriptor.type);
                 binding.pImmutableSamplers = nullptr;
-                binding.stageFlags = VkShaderStage(desc->rootParameters[i].dynamicDescriptor.stage);
+                binding.stageFlags = VkShaderStage(param.dynamicDescriptor.stage);
                 layoutInfo.bindingCount = 1;
                 layoutInfo.pBindings = &binding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -732,30 +732,30 @@ namespace RHI
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
                 std::get<1>(descriptorSetLayout[numLayouts]) = RootParameterType::DynamicDescriptor;
-                std::get<2>(descriptorSetLayout[numLayouts]) = desc->rootParameters[i].dynamicDescriptor.setIndex;
+                std::get<2>(descriptorSetLayout[numLayouts]) = param.dynamicDescriptor.setIndex;
                 numLayouts++;
             }
-            else if(desc->rootParameters[i].type == RootParameterType::PushConstant)
+            else if(param.type == RootParameterType::PushConstant)
             {
-                pushConstantRanges[pcIndex].offset = desc->rootParameters[i].pushConstant.offset;
-                pushConstantRanges[pcIndex].size = desc->rootParameters[i].pushConstant.numConstants * sizeof(uint32_t);
-                pushConstantRanges[pcIndex].stageFlags = vrootSignature->pcBindingToStage[desc->rootParameters[i].pushConstant.bindingIndex] =
-                VkShaderStage(desc->rootParameters[i].pushConstant.stage);
+                pushConstantRanges[pcIndex].offset = param.pushConstant.offset;
+                pushConstantRanges[pcIndex].size = param.pushConstant.numConstants * sizeof(uint32_t);
+                pushConstantRanges[pcIndex].stageFlags = vrootSignature->pcBindingToStage[param.pushConstant.bindingIndex] =
+                VkShaderStage(param.pushConstant.stage);
                 pcIndex++;
             }
-            else if(desc->rootParameters[i].type == RootParameterType::DescriptorTable)
+            else if(param.type == RootParameterType::DescriptorTable)
             {
                 VkDescriptorSetLayoutCreateInfo layoutInfo{};
                 VkDescriptorSetLayoutBinding LayoutBinding[20] = {};
-                for (uint32_t j = 0; j < desc->rootParameters[i].descriptorTable.numDescriptorRanges; j++)
+                for (uint32_t j = 0; j < param.descriptorTable.ranges.size(); j++)
                 {
-                    LayoutBinding[j].binding = desc->rootParameters[i].descriptorTable.ranges[j].BaseShaderRegister;
-                    LayoutBinding[j].descriptorCount = desc->rootParameters[i].descriptorTable.ranges[j].numDescriptors;
-                    LayoutBinding[j].descriptorType = DescType(desc->rootParameters[i].descriptorTable.ranges[j].type);
+                    LayoutBinding[j].binding = param.descriptorTable.ranges[j].BaseShaderRegister;
+                    LayoutBinding[j].descriptorCount = param.descriptorTable.ranges[j].numDescriptors;
+                    LayoutBinding[j].descriptorType = DescType(param.descriptorTable.ranges[j].type);
                     LayoutBinding[j].pImmutableSamplers = nullptr;
-                    LayoutBinding[j].stageFlags = VkShaderStage(desc->rootParameters[i].descriptorTable.ranges[j].stage);
+                    LayoutBinding[j].stageFlags = VkShaderStage(param.descriptorTable.ranges[j].stage);
                 }
-                layoutInfo.bindingCount = desc->rootParameters[i].descriptorTable.numDescriptorRanges;
+                layoutInfo.bindingCount = param.descriptorTable.ranges.size();
                 layoutInfo.pBindings = LayoutBinding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
                 res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, 
@@ -770,7 +770,7 @@ namespace RHI
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
                 std::get<1>(descriptorSetLayout[numLayouts]) = RootParameterType::DescriptorTable;
-                std::get<2>(descriptorSetLayout[numLayouts]) = desc->rootParameters[i].descriptorTable.setIndex;
+                std::get<2>(descriptorSetLayout[numLayouts]) = param.descriptorTable.setIndex;
                 numLayouts++;
             }
         }

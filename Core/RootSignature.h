@@ -1,4 +1,6 @@
 #pragma once
+#include <span>
+
 #include "Object.h"
 #include "FormatsAndTypes.h"
 namespace RHI
@@ -29,9 +31,8 @@ namespace RHI
 	};
 	struct DescriptorTable
 	{
-		std::uint32_t numDescriptorRanges;
+		std::span<DescriptorRange> ranges;
 		std::uint32_t setIndex;
-		DescriptorRange* ranges;
 	};
 	struct DynamicDescriptorDesc
 	{
@@ -61,7 +62,6 @@ namespace RHI
 	};
 	struct RHI_API RootSignatureDesc
 	{
-		std::uint32_t numRootParameters;
-		RootParameterDesc* rootParameters;
+		std::span<RootParameterDesc> rootParameters;
 	};
 }

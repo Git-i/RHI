@@ -55,7 +55,7 @@ namespace RHI
 		creation_result<Buffer> CreateBuffer(const BufferDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type);
 		MemoryReqirements GetBufferMemoryRequirements(const BufferDesc& desc);
 		MemoryReqirements GetTextureMemoryRequirements(const TextureDesc& desc);
-		creation_result<RootSignature> CreateRootSignature(RootSignatureDesc* desc, Ptr<DescriptorSetLayout>* pSetLayouts);
+		creation_result<RootSignature> CreateRootSignature(const RootSignatureDesc& desc, Ptr<DescriptorSetLayout>* pSetLayouts);
 		creation_result<Heap> CreateHeap(const HeapDesc& desc, bool* usedFallback);
 		creation_result<Fence> CreateFence(std::uint64_t val);
 		creation_result<DebugBuffer> CreateDebugBuffer();
