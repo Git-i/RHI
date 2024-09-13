@@ -3,12 +3,13 @@
 #include "FormatsAndTypes.h"
 namespace RHI
 {
+	enum class MappingError{ Unknown };
 	class RHI_API  Texture : public Object
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Texture);
 	public:
-		void Map(void** data);
+		ezr::result<void*, MappingError> Map();
 		void UnMap();
 	};
 
