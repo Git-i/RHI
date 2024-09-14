@@ -463,7 +463,8 @@ namespace RHI
             poolInfo.pPoolSizes = poolSize;
             poolInfo.maxSets = desc.maxDescriptorSets;
 
-            res = vkCreateDescriptorPool((VkDevice)ID, &poolInfo, nullptr, (VkDescriptorPool*)&vdescriptorHeap->ID);
+            res = vkCreateDescriptorPool(static_cast<VkDevice>(ID), &poolInfo, nullptr, reinterpret_cast<VkDescriptorPool*>(&vdescriptorHeap->ID));
+            vdescriptorHeap->device = make_ptr(this);
         }
         if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
         return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
@@ -1264,7 +1265,7 @@ namespace RHI
         info.flags = flags;
         info.format = FormatConv(desc.format);
         info.imageType = ImageType(desc.type);
-        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        info.initialLayout = static_cast<VkImageLayout>(desc.layout);
         info.mipLevels = desc.mipLevels;
         info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         info.tiling = ImageTiling(desc.mode);

@@ -38,6 +38,7 @@ namespace RHI
 		TextureTilingMode mode;
 		ClearValue* optimizedClearValue = nullptr;
 		TextureUsage usage;
+		ResourceLayout layout = ResourceLayout::UNDEFINED;
 	};
 	struct RHI_API RenderTargetViewDesc
 	{

@@ -48,7 +48,8 @@ extern "C"
 		}
 		RHI::vInstance* vinstance = new RHI::vInstance;
 		*instance = vinstance;
-		volkInitialize();
+		VkResult res = volkInitialize();
+		if(res != VK_SUCCESS) return res;
 		VkValidationFeatureEnableEXT enabled[] =
 		{
 			//VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
@@ -84,7 +85,7 @@ extern "C"
 		info.enabledExtensionCount = extensionName.size();
 		info.ppEnabledExtensionNames = extensionName.data();
 		info.pApplicationInfo = &appInfo;
-		VkResult res = vkCreateInstance(&info, nullptr, (VkInstance*)&vinstance->ID);
+		res = vkCreateInstance(&info, nullptr, (VkInstance*)&vinstance->ID);
 		volkLoadInstance((VkInstance)vinstance->ID);
 		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;

@@ -244,16 +244,16 @@ namespace RHI
 		std::vector<RootParameterDesc> rpDescs;
 		std::vector<std::vector<DescriptorRange>> ranges;
 		std::vector<std::vector<SRDescriptorSet>> sets;
-		for(auto ptr : refl)
+		for(const auto& ptr : refl)
 		{
 			std::vector<SRPushConstantBlock> blks(ptr->GetNumPushConstantBlocks());
 			ptr->GetAllPushConstantBlocks(blks.data());
-			for(auto& blk : blks)
+			for(auto& [num_constants, bindingIndex] : blks)
 			{
 				assert(push_block.has_value());
 				auto& desc = rpDescs.emplace_back();
 				desc.type = PushConstant;
-				desc.pushConstant.numConstants = blk.num_constants;
+				desc.pushConstant.numConstants = num_constants;
 				desc.pushConstant.bindingIndex = push_block.value();
 				desc.pushConstant.offset = 0;
 				desc.pushConstant.stage = ptr->GetStage();
@@ -319,31 +319,28 @@ namespace RHI
 				range.stage = ShaderStage::None;
 				for(auto& bnd : bindings) range.stage |= bnd.second;
 			}
-			param.descriptorTable.numDescriptorRanges = curr_ranges.size();
-			param.descriptorTable.ranges = curr_ranges.data();
+			param.descriptorTable.ranges = curr_ranges;
 		}
-		
-		rsDesc.numRootParameters = rpDescs.size();
-		rsDesc.rootParameters = rpDescs.data();
+
+		rsDesc.rootParameters = rpDescs;
 		return std::tuple{rsDesc, std::move(rpDescs), std::move(ranges)};
 	}
 	RootParameterDesc* GetParamForSet(const RootSignatureDesc& sig, uint32_t set)
 	{
-		for(uint32_t i = 0; i < sig.numRootParameters; i++)
+		for(auto & rootParameter : sig.rootParameters)
 		{
-			auto type = sig.rootParameters[i].type;
-			switch(type)
+			switch(rootParameter.type)
 			{
 				case RootParameterType::DescriptorTable:
 				{
-					auto& table = sig.rootParameters[i].descriptorTable;
-					if(table.setIndex == set) return &sig.rootParameters[i];
+					auto& table = rootParameter.descriptorTable;
+					if(table.setIndex == set) return &rootParameter;
 					break;
 				}
 				case RootParameterType::DynamicDescriptor:
 				{
-					auto& desc = sig.rootParameters[i].dynamicDescriptor;
-					if(desc.setIndex == set) return &sig.rootParameters[i];
+					auto& desc = rootParameter.dynamicDescriptor;
+					if(desc.setIndex == set) return &rootParameter;
 					break;
 				}
 				default: break;

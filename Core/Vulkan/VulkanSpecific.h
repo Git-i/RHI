@@ -121,13 +121,13 @@ namespace RHI
     class vDescriptorHeap : public DescriptorHeap
     {
     public:
-        virtual ~vDescriptorHeap() override
+        ~vDescriptorHeap() override
         {
-            if(type == DescriptorType::RTV) delete[] (VkImageView*)ID;
-            else if(type == DescriptorType::Sampler) delete[] (VkSampler*)ID;
-            else vkDestroyDescriptorPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDescriptorPool)DescriptorHeap::ID, nullptr);
+            if(type == DescriptorType::RTV) delete[] static_cast<VkImageView*>(ID);
+            else if(type == DescriptorType::Sampler) delete[] static_cast<VkSampler*>(ID);
+            else vkDestroyDescriptorPool(static_cast<VkDevice>(device.retrieve_as_forced<vDevice>()->ID), static_cast<VkDescriptorPool>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DESCRIPTOR_POOL;
         }

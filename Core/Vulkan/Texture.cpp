@@ -6,15 +6,17 @@ namespace RHI
 {
 	ezr::result<void*, MappingError> Texture::Map()
 	{
-		auto vtex = (vTexture*)this;
+		auto vtex = reinterpret_cast<vTexture*>(this);
 		void* data;
 		if (vtex->vma_ID)
 		{
-			auto res = vmaMapMemory((device.retrieve_as_forced<vDevice>())->allocator, vtex->vma_ID, &data);
-			if (res < VK_SUCCESS) return ezr::err(MappingError::Unknown);
+			if (const auto res = vmaMapMemory((device.retrieve_as_forced<vDevice>())->allocator, vtex->vma_ID, &data); res < VK_SUCCESS)
+				return ezr::err(MappingError::Unknown);
 			return data;
 		}
-		vkMapMemory((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDeviceMemory)vtex->heap->ID, vtex->offset, vtex->size, 0, &data);
+		if(const auto res = vkMapMemory(static_cast<VkDevice>(device.retrieve_as_forced<vDevice>()->ID), static_cast<VkDeviceMemory>(vtex->heap->ID), vtex->offset, vtex->size, 0, &data); res < VK_SUCCESS)
+			return ezr::err(MappingError::Unknown);
+		return data;
 	}
 	void Texture::UnMap()
 	{
@@ -24,7 +26,7 @@ namespace RHI
 			vmaUnmapMemory((device.retrieve_as_forced<vDevice>())->allocator, vtex->vma_ID);
             return;
 		}
-		vkUnmapMemory((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDeviceMemory)vtex->heap->ID);
+		vkUnmapMemory(static_cast<VkDevice>(device.retrieve_as_forced<vDevice>()->ID), static_cast<VkDeviceMemory>(vtex->heap->ID));
 	}
 }
 

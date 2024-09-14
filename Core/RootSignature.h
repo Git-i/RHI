@@ -55,7 +55,7 @@ namespace RHI
 	{
 		RootParameterType type;
 		union {
-			DescriptorTable descriptorTable;
+			DescriptorTable descriptorTable{};
 			PushConstant pushConstant;
 			DynamicDescriptorDesc dynamicDescriptor;
 		};
