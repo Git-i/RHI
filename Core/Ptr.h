@@ -49,11 +49,17 @@ namespace RHI
         {
             ptr = other;
         }
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>>>
-        Ptr(Ptr<U>&& other) noexcept
+        template<typename U>
+        explicit Ptr(Ptr<U>&& other) noexcept requires std::convertible_to<U*, T*>
         {
             ptr = other.ptr;
             other.ptr = nullptr;
+        }
+        template<typename U>
+        explicit Ptr(const Ptr<U>& other) noexcept requires std::convertible_to<U*, T*>
+        {
+            ptr = other.ptr;
+            SafeHold();
         }
 
         ~Ptr()
@@ -70,8 +76,8 @@ namespace RHI
         {
             return Weak<U>{(U*)ptr};
         }
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>>>
-        [[nodiscard]] Weak<U> retrieve_as() const
+        template<typename U>
+        [[nodiscard]] Weak<U> retrieve_as() const requires std::convertible_to<T*, U*>
         {
             return Weak<U>{ptr};
         }
@@ -84,15 +90,15 @@ namespace RHI
             return val;
         }
 
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
-        void operator=(const Ptr<U>& other)
+        template<typename U>
+        void operator=(const Ptr<U>& other) requires std::convertible_to<U*, T*>
         {
             SafeRelease();
             ptr = other.ptr;
             SafeHold();
         }
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
-        void operator=(Ptr<U>&& other)
+        template<typename U>
+        void operator=(Ptr<U>&& other) requires std::convertible_to<U*, T*>
         {
             SafeRelease();
             ptr = other.ptr;
@@ -180,15 +186,15 @@ namespace RHI
         {
             return ptr;
         }
-        template< typename U, typename = std::enable_if_t<std::is_convertible_v<T*, U*>> >
-        Weak<U> Transform()
+        template<typename U>
+        Weak<U> Transform() requires std::convertible_to<T*, U*>
         {
-            return Weak<U>{(U*)ptr};
+            return Weak<U>{static_cast<U*>(ptr)};
         }
         template<typename U>
         Weak<U> ForceTransform()
         {
-            return Weak<U>{(U*)ptr};
+            return Weak<U>{reinterpret_cast<U*>(ptr)};
         }
         void operator=(const Ptr<T>& ptr)
         {
