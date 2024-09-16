@@ -11,7 +11,7 @@ namespace RHI
 	{
 		Default,
 		Upload,
-		Readback,
+		ReadBack,
 		Custom
 	};
 	enum class CPUPageProperty
@@ -41,7 +41,7 @@ namespace RHI
 		std::uint64_t size;
 		HeapProperties props;
 	};
-	struct RHI_API MemoryReqirements
+	struct RHI_API MemoryRequirements
 	{
 		std::uint64_t size;
 		std::uint64_t alignment;

@@ -65,20 +65,20 @@ namespace RHI
     Device::Create(PhysicalDevice* PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, Internal_ID instance, DeviceCreateFlags flags)
     {
         uint32_t numCommandQueues = commandQueueInfos.size();
-        VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
+        auto vkPhysicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         VkPhysicalDeviceMemoryProperties memProps;
         Ptr<vDevice> vdevice(new RHI::vDevice);
         std::vector<Ptr<CommandQueue>> vqueue;
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
         for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
         {
-            VkFlags flags = memProps.memoryTypes[i].propertyFlags;
+            VkFlags mem_flags = memProps.memoryTypes[i].propertyFlags;
             RHI::HeapProperties prop;
             prop.type = RHI::HeapType::Custom;
-            prop.memoryLevel = (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? RHI::MemoryLevel::DedicatedRAM : RHI::MemoryLevel::SharedRAM;
+            prop.memoryLevel = (mem_flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? RHI::MemoryLevel::DedicatedRAM : RHI::MemoryLevel::SharedRAM;
             RHI::CPUPageProperty CPUprop;
-            if (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) CPUprop = RHI::CPUPageProperty::WriteCached;
-            else if (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) CPUprop = RHI::CPUPageProperty::WriteCombined;
+            if (mem_flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) CPUprop = RHI::CPUPageProperty::WriteCached;
+            else if (mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) CPUprop = RHI::CPUPageProperty::WriteCombined;
             else CPUprop = RHI::CPUPageProperty::NonVisible;
             prop.pageProperty = CPUprop;
             vdevice->HeapProps.emplace_back(prop);
@@ -113,7 +113,7 @@ namespace RHI
             queuePriority.push_back(qi.Priority);
 
             qInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            qInfo.pNext = NULL;
+            qInfo.pNext = nullptr;
             qInfo.pQueuePriorities = queuePriority.data();
             qi._unused = usedQueues[index]++;
             qInfo.queueCount = usedQueues[index];
@@ -168,7 +168,7 @@ namespace RHI
         };
         info.enabledExtensionCount = ARRAYSIZE(ext_name);
         info.ppEnabledExtensionNames = ext_name;
-        VkResult res = vkCreateDevice(vkPhysicalDevice, &info, nullptr, (VkDevice*)&vdevice->ID);
+        VkResult res = vkCreateDevice(vkPhysicalDevice, &info, nullptr, reinterpret_cast<VkDevice*>(&vdevice->ID));
         if(res < 0)
         {
             return ezr::err(marshall_error(res));
@@ -181,7 +181,7 @@ namespace RHI
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Direct) index = vdevice->indices.graphicsIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Compute) index = vdevice->indices.computeIndex;
             if (commandQueueInfos[i].commandListType == RHI::CommandListType::Copy) index = vdevice->indices.copyIndex;
-            vkGetDeviceQueue((VkDevice)vdevice->ID, index, commandQueueInfos[i]._unused, (VkQueue*)&vqueue[i]->ID);
+            vkGetDeviceQueue(static_cast<VkDevice>(vdevice->ID), index, commandQueueInfos[i]._unused, reinterpret_cast<VkQueue*>(&vqueue[i]->ID));
         }
         //initialize VMA
         VkExternalMemoryHandleTypeFlagsKHR ext_mem[] = {
@@ -192,25 +192,25 @@ namespace RHI
 
         };
         VmaAllocatorCreateInfo vmaInfo{};
-        vmaInfo.device = (VkDevice)vdevice->ID;
+        vmaInfo.device = static_cast<VkDevice>(vdevice->ID);
         vmaInfo.flags = 0; //probably have error checking
-        vmaInfo.instance = (VkInstance)instance;
-        vmaInfo.physicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
+        vmaInfo.instance = static_cast<VkInstance>(instance);
+        vmaInfo.physicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         vmaInfo.pVulkanFunctions = nullptr;
-        vmaInfo.pTypeExternalMemoryHandleTypes = (flags & RHI::DeviceCreateFlags::ShareAutomaticMemory) != RHI::DeviceCreateFlags::None ? ext_mem:0;//
+        vmaInfo.pTypeExternalMemoryHandleTypes = (flags & RHI::DeviceCreateFlags::ShareAutomaticMemory) != RHI::DeviceCreateFlags::None ? ext_mem:nullptr;//
 
         res = vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
         if(res < 0) return ezr::err(marshall_error(res));
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
-        acInfo.vkDevice = (VkDevice)vdevice->ID;
-        acInfo.vkPhysicalDevice = (VkPhysicalDevice)PhysicalDevice->ID;
+        acInfo.vkDevice = static_cast<VkDevice>(vdevice->ID);
+        acInfo.vkPhysicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
         return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), vqueue});
     }
-    creation_result<Device> Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, QueueFamilyIndices indices)
+    creation_result<Device> Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, const QueueFamilyIndices& indices)
     {
-        VkPhysicalDevice vkPhysicalDevice = (VkPhysicalDevice)phys_device;
+        auto vkPhysicalDevice = static_cast<VkPhysicalDevice>(phys_device);
         VkPhysicalDeviceMemoryProperties memProps;
         Ptr<vDevice> vdevice(new RHI::vDevice);
         vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &memProps);
@@ -231,22 +231,22 @@ namespace RHI
         vdevice->indices = indices;
         vdevice->ID = id;
         VmaAllocatorCreateInfo vmaInfo{};
-        vmaInfo.device = (VkDevice)vdevice->ID;
+        vmaInfo.device = static_cast<VkDevice>(vdevice->ID);
         vmaInfo.flags = 0; //probably have error checking
-        vmaInfo.instance = (VkInstance)instance;
+        vmaInfo.instance = static_cast<VkInstance>(instance);
         vmaInfo.physicalDevice = vkPhysicalDevice;
         vmaInfo.pVulkanFunctions = nullptr;
-        vmaInfo.pTypeExternalMemoryHandleTypes = 0;
+        vmaInfo.pTypeExternalMemoryHandleTypes = nullptr;
 
         VkResult res = vmaCreateAllocator(&vmaInfo, &vdevice->allocator);
         if(res < 0) return ezr::err(marshall_error(res));
         VkAfterCrash_DeviceCreateInfo acInfo;
         acInfo.flags = 0;
-        acInfo.vkDevice = (VkDevice)vdevice->ID;
+        acInfo.vkDevice = static_cast<VkDevice>(vdevice->ID);
         acInfo.vkPhysicalDevice = vkPhysicalDevice;
         res = VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
         if(res < 0) return ezr::err(marshall_error(res));
-        vdevice->Hold();//the device doesnt belong to us, so we keep it alive for the external user
+        vdevice->Hold();//the device doesn't belong to us, so we keep it alive for the external user
         return ezr::ok(vdevice.transform<Device>());
     }
     Default_t Default = {};
@@ -260,9 +260,12 @@ namespace RHI
         std::vector<char> buffer;
         std::ifstream file(filename, std::ios::binary);
         uint32_t spvSize;
-        file.read((char*)&spvSize, 4);
-        std::span size_bytes = std::as_writable_bytes(std::span{&spvSize, 1});
-        if(std::endian::native != std::endian::little) std::reverse(size_bytes.begin(), size_bytes.end());
+        file.read(reinterpret_cast<char*>(&spvSize), 4);
+        if constexpr  (std::endian::native != std::endian::little)
+        {
+            std::span size_bytes = std::as_writable_bytes(std::span{&spvSize, 1});
+            std::ranges::reverse(size_bytes);
+        }
         if(spvSize == 0) return CreationError::IncompatibleShader;
         buffer.resize(spvSize);
         file.read(buffer.data(), spvSize);
@@ -271,13 +274,13 @@ namespace RHI
         info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         info.codeSize = buffer.size();
         info.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
-        auto res = vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
-        if(res < VK_SUCCESS) return marshall_error(res);
-        auto& vertShaderStageInfo = shader_info[index];
-        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        vertShaderStageInfo.stage = stage;
-        vertShaderStageInfo.module = module[index];
-        vertShaderStageInfo.pName = "main";
+        if(auto res = vkCreateShaderModule(static_cast<VkDevice>(device), &info, nullptr, &module[index]); res < VK_SUCCESS)
+            return marshall_error(res);
+        auto& [sType, pNext, flags, stg, md, pName, pSpecializationInfo] = shader_info[index];
+        sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stg = stage;
+        md = module[index];
+        pName = "main";
 
         return CreationError::None;
     }
@@ -287,13 +290,13 @@ namespace RHI
         info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         info.codeSize = size;
         info.pCode = reinterpret_cast<const uint32_t*>(memory);
-        auto res = vkCreateShaderModule((VkDevice)device, &info, nullptr, &module[index]);
-        if(res < VK_SUCCESS) return marshall_error(res);
-        auto& vertShaderStageInfo = shader_info[index];
-        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        vertShaderStageInfo.stage = stage;
-        vertShaderStageInfo.module = module[index];
-        vertShaderStageInfo.pName = "main";
+        if(const auto res = vkCreateShaderModule(static_cast<VkDevice>(device), &info, nullptr, &module[index]); res < VK_SUCCESS)
+            return marshall_error(res);
+        auto& [sType, pNext, flags, stg, md, pName, pSpecializationInfo] = shader_info[index];
+        sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stg = stage;
+        md = module[index];
+        pName = "main";
         return CreationError::None;
     }
     VkExternalMemoryHandleTypeFlagBitsKHR MemFlags(ExportOptions opt)
@@ -301,13 +304,9 @@ namespace RHI
         switch (opt)
         {
         case RHI::ExportOptions::D3D11TextureNT:return VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT_KHR;
-            break;
         case RHI::ExportOptions::Win32Handle:return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-            break;
         case RHI::ExportOptions::FD:return VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-            break;
-        default:return VkExternalMemoryHandleTypeFlagBitsKHR(0);
-            break;
+        default:return VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM;
         }
     }
     RESULT Device::GetMemorySharingCapabilites()
@@ -317,7 +316,7 @@ namespace RHI
 
     RESULT Device::ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle)
     {
-        vTexture* vtex = (vTexture*)texture;
+        auto* vtex = reinterpret_cast<vTexture*>(texture);
         #ifdef WIN32
         VkMemoryGetWin32HandleInfoKHR info;
         info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap;
@@ -328,15 +327,15 @@ namespace RHI
         #endif
         VkMemoryGetFdInfoKHR info;
         info.handleType = MemFlags(options);
-        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap.Get();
-        info.pNext = 0;
+        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : reinterpret_cast<VkDeviceMemory>(vtex->heap.Get());
+        info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
-        return vkGetMemoryFdKHR((VkDevice)ID,&info,handle);
+        return vkGetMemoryFdKHR(static_cast<VkDevice>(ID),&info,handle);
 
     }
     RESULT Device::QueueWaitIdle(Weak<CommandQueue> queue)
     {
-        return vkQueueWaitIdle((VkQueue)queue->ID);
+        return vkQueueWaitIdle(static_cast<VkQueue>(queue->ID));
     }
     static VkBufferUsageFlags VkBufferUsage(RHI::BufferUsage usage)
     {
@@ -371,31 +370,31 @@ namespace RHI
     {
         Ptr<vCommandAllocator> vallocator(new vCommandAllocator);
         std::uint32_t index = 0;
-        if (type == CommandListType::Direct) index = ((vDevice*)this)->indices.graphicsIndex;
-        if (type == CommandListType::Compute) index = ((vDevice*)this)->indices.computeIndex;
-        if (type == CommandListType::Copy) index = ((vDevice*)this)->indices.copyIndex;
+        if (type == CommandListType::Direct) index = reinterpret_cast<vDevice*>(this)->indices.graphicsIndex;
+        if (type == CommandListType::Compute) index = reinterpret_cast<vDevice*>(this)->indices.computeIndex;
+        if (type == CommandListType::Copy) index = reinterpret_cast<vDevice*>(this)->indices.copyIndex;
         VkCommandPoolCreateInfo info{};
-        info.pNext = NULL;
+        info.pNext = nullptr;
         info.queueFamilyIndex = index;
         info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; //to align with d3d's model
-        VkResult res = vkCreateCommandPool((VkDevice)ID, &info, nullptr, (VkCommandPool*)&vallocator->ID);
+        VkResult res = vkCreateCommandPool(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkCommandPool*>(&vallocator->ID));
         vallocator->device = make_ptr(this);
 
 
         if(res < 0) return creation_result<CommandAllocator>::err(marshall_error(res));
         return creation_result<CommandAllocator>::ok(vallocator);
     }
-    creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, Ptr<CommandAllocator> allocator)
+    creation_result<GraphicsCommandList> Device::CreateCommandList(CommandListType type, const Ptr<CommandAllocator>& allocator)
     {
         Ptr<vGraphicsCommandList> vCommandlist(new vGraphicsCommandList);
         VkCommandBufferAllocateInfo Info = {};
         Info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        Info.commandPool = (VkCommandPool)allocator->ID;
+        Info.commandPool = static_cast<VkCommandPool>(allocator->ID);
         Info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         Info.commandBufferCount = 1;
         VkCommandBuffer commandBuffer;
-        VkResult res = vkAllocateCommandBuffers((VkDevice)ID, &Info, &commandBuffer);
+        const VkResult res = vkAllocateCommandBuffers(static_cast<VkDevice>(ID), &Info, &commandBuffer);
         vCommandlist->ID = commandBuffer;
         vCommandlist->device = make_ptr(this);
         vCommandlist->allocator = allocator.transform<vCommandAllocator>();
@@ -411,26 +410,18 @@ namespace RHI
     }
     VkDescriptorType DescType(RHI::DescriptorType type)
     {
+        using enum DescriptorType;
         switch (type)
         {
-        case RHI::DescriptorType::SampledTexture: return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-            break;
-        case RHI::DescriptorType::ConstantBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            break;
-        case RHI::DescriptorType::StructuredBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            break;
-        case RHI::DescriptorType::ConstantBufferDynamic: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-            break;
-        case RHI::DescriptorType::StructuredBufferDynamic: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-            break;
-        case RHI::DescriptorType::Sampler: return VK_DESCRIPTOR_TYPE_SAMPLER;
-            break;
-        case RHI::DescriptorType::CSTexture: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            break;
-        case RHI::DescriptorType::CSBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            break;
+        case SampledTexture: return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        case ConstantBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        case StructuredBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case ConstantBufferDynamic: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        case StructuredBufferDynamic: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+        case Sampler: return VK_DESCRIPTOR_TYPE_SAMPLER;
+        case CSTexture: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        case CSBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         default: return VK_DESCRIPTOR_TYPE_MAX_ENUM;
-            break;
         }
     }
     creation_result<DescriptorHeap> Device::CreateDescriptorHeap(const DescriptorHeapDesc& desc)
@@ -469,13 +460,13 @@ namespace RHI
         if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
         return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
     }
-    CreationError Device::CreateRenderTargetView(Weak<Texture> texture, const RenderTargetViewDesc& desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateRenderTargetView(const Weak<Texture> texture, const RenderTargetViewDesc& desc, const CPU_HANDLE heapHandle) const
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        info.pNext = NULL;
+        info.pNext = nullptr;
         info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        info.image = (VkImage)texture->ID;
+        info.image = static_cast<VkImage>(texture->ID);
         info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -486,16 +477,16 @@ namespace RHI
         info.subresourceRange.baseArrayLayer = desc.TextureArray ? desc.arraySlice: 0;
         info.subresourceRange.layerCount = 1;
         info.format = FormatConv(desc.format);
-       return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
+       return marshall_error(vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, static_cast<VkImageView*>(heapHandle.ptr)));
 
     }
-    CreationError Device::CreateDepthStencilView(Weak<Texture> texture, const DepthStencilViewDesc& desc, CPU_HANDLE heapHandle)
+    CreationError Device::CreateDepthStencilView(const Weak<Texture> texture, const DepthStencilViewDesc& desc, const CPU_HANDLE heapHandle) const
     {
         VkImageViewCreateInfo info = {};
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        info.pNext = NULL;
+        info.pNext = nullptr;
         info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        info.image = (VkImage)texture->ID;
+        info.image = static_cast<VkImage>(texture->ID);
         info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -506,7 +497,7 @@ namespace RHI
         info.subresourceRange.baseArrayLayer = desc.TextureArray ? desc.arraySlice:0;
         info.subresourceRange.layerCount = 1;
         info.format = FormatConv(desc.format);
-        return marshall_error(vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)heapHandle.ptr));
+        return marshall_error(vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, static_cast<VkImageView*>(heapHandle.ptr)));
     }
     std::uint32_t Device::GetDescriptorHeapIncrementSize(DescriptorType type)
     {
@@ -521,7 +512,7 @@ namespace RHI
         Ptr<vTexture> vtexture(new vTexture);
         std::uint32_t img = index + 1;
         std::vector<VkImage> images(img);
-        VkResult res = vkGetSwapchainImagesKHR((VkDevice)ID, (VkSwapchainKHR)swapchain->ID, &img, images.data());
+        VkResult res = vkGetSwapchainImagesKHR(static_cast<VkDevice>(ID), static_cast<VkSwapchainKHR>(swapchain->ID), &img, images.data());
         vtexture->ID = images[index];
         vtexture->Hold();//the image is externally owned
         vtexture->device = make_ptr(this);
@@ -533,7 +524,7 @@ namespace RHI
         Ptr<vFence> vfence(new vFence);
         VkSemaphoreTypeCreateInfo timelineCreateInfo;
         timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        timelineCreateInfo.pNext = NULL;
+        timelineCreateInfo.pNext = nullptr;
         timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
         timelineCreateInfo.initialValue = val;
 
@@ -543,14 +534,14 @@ namespace RHI
         createInfo.flags = 0;
 
         VkSemaphore timelineSemaphore;
-        VkResult res = vkCreateSemaphore((VkDevice)ID, &createInfo, NULL, &timelineSemaphore);
+        const VkResult res = vkCreateSemaphore(static_cast<VkDevice>(ID), &createInfo, nullptr, &timelineSemaphore);
         vfence->ID = timelineSemaphore;
         vfence->device = make_ptr(this);
 
         if(res < 0) return creation_result<Fence>::err(marshall_error(res));
         return creation_result<Fence>::ok(vfence);
     }
-    creation_result<Buffer> Device::CreateBuffer(const BufferDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info, std::uint64_t offset, ResourceType type)
+    creation_result<Buffer> Device::CreateBuffer(const BufferDesc& desc, const Ptr<Heap>& heap, const HeapProperties* props, const AutomaticAllocationInfo* automatic_info, const std::uint64_t offset, const ResourceType type)
     {
         Ptr<vBuffer> vbuffer(new vBuffer);
         VkBufferCreateInfo info{};
@@ -568,34 +559,34 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            VkResult res = vmaCreateBuffer(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkBuffer*)&vbuffer->ID, &vbuffer->vma_ID, nullptr);
+            VkResult res = vmaCreateBuffer(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkBuffer*>(&vbuffer->ID), &vbuffer->vma_ID, nullptr);
 
             if(res < 0) creation_result<Buffer>::err(marshall_error(res));
             return creation_result<Buffer>::ok(vbuffer);
         }
         vbuffer->offset = offset;
         vbuffer->size = desc.size;
-        VkResult res = vkCreateBuffer((VkDevice)ID, &info, nullptr, (VkBuffer*)&vbuffer->ID);
+        VkResult res = vkCreateBuffer(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkBuffer*>(&vbuffer->ID));
         if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         if (type == ResourceType::Commited)
         {
-            MemoryReqirements req = GetBufferMemoryRequirements(desc);
+            MemoryRequirements req = GetBufferMemoryRequirements(desc);
             auto r = CreateHeap(HeapDesc{req.size, *props}, nullptr);
             if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Buffer>{return nullptr;});
             vbuffer->heap = r.value();
-            res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)vbuffer->heap->ID, 0);
+            res = vkBindBufferMemory(static_cast<VkDevice>(ID), static_cast<VkBuffer>(vbuffer->ID), static_cast<VkDeviceMemory>(vbuffer->heap->ID), 0);
             if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
             vbuffer->heap = heap;
-            res = vkBindBufferMemory((VkDevice)ID, (VkBuffer)vbuffer->ID, (VkDeviceMemory)heap->ID, offset);
+            res = vkBindBufferMemory(static_cast<VkDevice>(ID), static_cast<VkBuffer>(vbuffer->ID), static_cast<VkDeviceMemory>(heap->ID), offset);
             if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
 
         return creation_result<Buffer>::ok(vbuffer);
     }
-    MemoryReqirements Device::GetBufferMemoryRequirements(const BufferDesc& desc)
+    MemoryRequirements Device::GetBufferMemoryRequirements(const BufferDesc& desc)
     {
         VkBufferCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -607,11 +598,12 @@ namespace RHI
         DeviceReq.pCreateInfo = &info;
         VkMemoryRequirements2 req{};
         req.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
-        vkGetDeviceBufferMemoryRequirementsKHR((VkDevice)ID, &DeviceReq, &req);
-        MemoryReqirements requirements;
-        requirements.alignment = req.memoryRequirements.alignment;
-        requirements.size = req.memoryRequirements.size;
-        requirements.memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        vkGetDeviceBufferMemoryRequirementsKHR(static_cast<VkDevice>(ID), &DeviceReq, &req);
+        const MemoryRequirements requirements {
+            .size = req.memoryRequirements.size,
+            .alignment = req.memoryRequirements.alignment,
+            .memoryTypeBits = req.memoryRequirements.memoryTypeBits,
+        };
         return requirements;
     }
     creation_result<Heap> Device::CreateHeap(const HeapDesc& desc, bool* usedFallback)
@@ -625,7 +617,7 @@ namespace RHI
         if (desc.props.type == HeapType::Custom)
         {
             uint32_t iterator = 0;
-            for (auto& prop : ((vDevice*)this)->HeapProps)
+            for (const auto& prop : reinterpret_cast<vDevice*>(this)->HeapProps)
             {
                 if (prop.memoryLevel != desc.props.memoryLevel) { iterator++; continue; }
                 if (prop.pageProperty != CPUPageProperty::NonVisible && desc.props.pageProperty == CPUPageProperty::Any)
@@ -639,19 +631,19 @@ namespace RHI
             if (MemIndex == UINT32_MAX)
             {
                 if(usedFallback)*usedFallback = true;
-                if (desc.props.FallbackType == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
-                if (desc.props.FallbackType == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
-                if (desc.props.FallbackType == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
+                if (desc.props.FallbackType == HeapType::Default)  MemIndex = reinterpret_cast<vDevice*>(this)->DefaultHeapIndex;
+                if (desc.props.FallbackType == HeapType::Upload)   MemIndex = reinterpret_cast<vDevice*>(this)->UploadHeapIndex;
+                if (desc.props.FallbackType == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadbackHeapIndex;
             }
         }
         else
         {
-            if (desc.props.type == HeapType::Default)  MemIndex = ((vDevice*)this)->DefaultHeapIndex;
-            if (desc.props.type == HeapType::Upload)   MemIndex = ((vDevice*)this)->UploadHeapIndex;
-            if (desc.props.type == HeapType::Readback) MemIndex = ((vDevice*)this)->ReadbackHeapIndex;
+            if (desc.props.type == HeapType::Default)  MemIndex = reinterpret_cast<vDevice*>(this)->DefaultHeapIndex;
+            if (desc.props.type == HeapType::Upload)   MemIndex = reinterpret_cast<vDevice*>(this)->UploadHeapIndex;
+            if (desc.props.type == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadbackHeapIndex;
         }
         allocInfo.memoryTypeIndex = MemIndex;
-        VkResult res = vkAllocateMemory((VkDevice)ID, &allocInfo, nullptr, (VkDeviceMemory*)&vheap->ID);
+        VkResult res = vkAllocateMemory(static_cast<VkDevice>(ID), &allocInfo, nullptr, reinterpret_cast<VkDeviceMemory*>(&vheap->ID));
         if(res < 0) return creation_result<Heap>::err(marshall_error(res));
 
         return creation_result<Heap>::ok(vheap);
@@ -706,8 +698,8 @@ namespace RHI
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
-                                    if(std::get<0>(descriptorSetLayout[j])) 
-                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
+                        if(std::get<0>(descriptorSetLayout[j]))
+                            vkDestroyDescriptorSetLayout(static_cast<VkDevice>(ID), std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return ezr::err(CreationError::InvalidParameters);
                 }
@@ -721,14 +713,14 @@ namespace RHI
                 layoutInfo.bindingCount = 1;
                 layoutInfo.pBindings = &binding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, 
+                res = vkCreateDescriptorSetLayout(static_cast<VkDevice>(ID), &layoutInfo, nullptr,
                     &std::get<0>(descriptorSetLayout[numLayouts]));
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
                         if(std::get<0>(descriptorSetLayout[j])) 
-                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
+                            vkDestroyDescriptorSetLayout(static_cast<VkDevice>(ID), std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
@@ -759,14 +751,14 @@ namespace RHI
                 layoutInfo.bindingCount = param.descriptorTable.ranges.size();
                 layoutInfo.pBindings = LayoutBinding;
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                res = vkCreateDescriptorSetLayout((VkDevice)ID, &layoutInfo, nullptr, 
+                res = vkCreateDescriptorSetLayout(static_cast<VkDevice>(ID), &layoutInfo, nullptr,
                 &std::get<0>(descriptorSetLayout[numLayouts]));
                 if(res < 0)
                 {
                     for(uint32_t j = 0; j < numLayouts; j++)
                     {
                         if(std::get<0>(descriptorSetLayout[j])) 
-                            vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[j]), nullptr);
+                            vkDestroyDescriptorSetLayout(static_cast<VkDevice>(ID), std::get<0>(descriptorSetLayout[j]), nullptr);
                     }
                     return creation_result<RootSignature>::err(marshall_error(res));
                 }
@@ -788,7 +780,7 @@ namespace RHI
         pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
         pipelineLayoutInfo.pushConstantRangeCount = pcIndex;
 
-        res = vkCreatePipelineLayout((VkDevice)ID, &pipelineLayoutInfo, nullptr, (VkPipelineLayout*)&vrootSignature->ID);
+        res = vkCreatePipelineLayout(static_cast<VkDevice>(ID), &pipelineLayoutInfo, nullptr, reinterpret_cast<VkPipelineLayout*>(&vrootSignature->ID));
         if(res < 0)
         {
             return creation_result<RootSignature>::err(marshall_error(res));
@@ -799,7 +791,7 @@ namespace RHI
         {
             if (std::get<1>(descriptorSetLayout[i]) == RootParameterType::DynamicDescriptor)
             {
-                vkDestroyDescriptorSetLayout((VkDevice)ID, std::get<0>(descriptorSetLayout[i]), nullptr);
+                vkDestroyDescriptorSetLayout(static_cast<VkDevice>(ID), std::get<0>(descriptorSetLayout[i]), nullptr);
                 continue;
             }
 
@@ -810,66 +802,48 @@ namespace RHI
         }
         return creation_result<RootSignature>::ok(vrootSignature);
     }
-    const VkCompareOp vkCompareFunc(RHI::ComparisonFunc func)
+    VkCompareOp vkCompareFunc(const ComparisonFunc func)
     {
+        using enum ComparisonFunc;
         switch (func)
         {
-        case RHI::ComparisonFunc::Never: return VK_COMPARE_OP_NEVER;
-            break;
-        case RHI::ComparisonFunc::Less: return VK_COMPARE_OP_LESS;
-            break;
-        case RHI::ComparisonFunc::Equal: return VK_COMPARE_OP_EQUAL;
-            break;
-        case RHI::ComparisonFunc::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
-            break;
-        case RHI::ComparisonFunc::Greater: return VK_COMPARE_OP_GREATER;
-            break;
-        case RHI::ComparisonFunc::NotEqual: return VK_COMPARE_OP_NOT_EQUAL;
-            break;
-        case RHI::ComparisonFunc::GreaterEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
-            break;
-        case RHI::ComparisonFunc::Always: return VK_COMPARE_OP_ALWAYS;
-            break;
+        case Never: return VK_COMPARE_OP_NEVER;
+        case Less: return VK_COMPARE_OP_LESS;
+        case Equal: return VK_COMPARE_OP_EQUAL;
+        case LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case Greater: return VK_COMPARE_OP_GREATER;
+        case NotEqual: return VK_COMPARE_OP_NOT_EQUAL;
+        case GreaterEqual: return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        case Always: return VK_COMPARE_OP_ALWAYS;
         default: return VK_COMPARE_OP_MAX_ENUM;
-            break;
         }
     }
-    const VkStencilOp vkStenOp(RHI::StencilOp op)
+
+    VkStencilOp vkStenOp(const StencilOp op)
     {
+        using enum StencilOp;
         switch (op)
         {
-        case RHI::StencilOp::Keep: return VK_STENCIL_OP_KEEP;
-            break;
-        case RHI::StencilOp::Zero: return VK_STENCIL_OP_ZERO;
-            break;
-        case RHI::StencilOp::Replace: return VK_STENCIL_OP_REPLACE;
-            break;
-        case RHI::StencilOp::IncrSat: return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
-            break;
-        case RHI::StencilOp::DecrSat: return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
-            break;
-        case RHI::StencilOp::Invert: return VK_STENCIL_OP_INVERT;
-            break;
-        case RHI::StencilOp::Incr: return VK_STENCIL_OP_INCREMENT_AND_WRAP;
-            break;
-        case RHI::StencilOp::Decr: return VK_STENCIL_OP_DECREMENT_AND_WRAP;
-            break;
+        case Keep: return VK_STENCIL_OP_KEEP;
+        case Zero: return VK_STENCIL_OP_ZERO;
+        case Replace: return VK_STENCIL_OP_REPLACE;
+        case IncrSat: return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+        case DecrSat: return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+        case Invert: return VK_STENCIL_OP_INVERT;
+        case Incr: return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+        case Decr: return VK_STENCIL_OP_DECREMENT_AND_WRAP;
         default: return VK_STENCIL_OP_MAX_ENUM;
-            break;
         }
     }
-    VkCullModeFlags VkCullMode(CullMode mode)
+    VkCullModeFlags VkCullMode(const CullMode mode)
     {
+        using enum CullMode;
         switch (mode)
         {
-        case RHI::CullMode::None: return VK_CULL_MODE_NONE;
-            break;
-        case RHI::CullMode::Front: return VK_CULL_MODE_FRONT_BIT;
-            break;
-        case RHI::CullMode::Back: return VK_CULL_MODE_BACK_BIT;
-            break;
+        case None: return VK_CULL_MODE_NONE;
+        case Front: return VK_CULL_MODE_FRONT_BIT;
+        case Back: return VK_CULL_MODE_BACK_BIT;
         default: return VK_CULL_MODE_NONE;
-            break;
         }
     }
     creation_result<PipelineStateObject> Device::CreatePipelineStateObject(const PipelineStateObjectDesc& desc)
@@ -879,9 +853,9 @@ namespace RHI
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
         int index = 0;
-        auto createShader = [&](const ShaderCode& code, VkShaderStageFlagBits bits){
+        auto createShader = [&](const ShaderCode& code, const VkShaderStageFlagBits bits){
             CreationError err = CreationError::None;
-            if(code.data.size())
+            if(code.data.empty())
             {
                 if(desc.shaderMode == File) err = CreateShaderModule(std::string(code.data).c_str(), ShaderpipelineInfo, bits, index, modules, ID);
                 else err = CreateShaderModule(code.data.data(), code.data.size(), ShaderpipelineInfo, bits, index, modules, ID);
@@ -891,9 +865,9 @@ namespace RHI
         };
         auto cleanShaders = [&](CreationError err) {
             if(err == CreationError::None) return false;
-            for(auto module: std::span{modules, (size_t)index})
+            for(const auto module: std::span{modules, static_cast<size_t>(index)})
             {
-                vkDestroyShaderModule((VkDevice)ID, module, nullptr);
+                vkDestroyShaderModule(static_cast<VkDevice>(ID), module, nullptr);
             }
             return true;
         };
@@ -927,7 +901,7 @@ namespace RHI
         for (uint32_t i = 0; i < desc.numInputBindings; i++)
         {
             inputbindingDesc[i].binding = i;
-            inputbindingDesc[i].inputRate = (VkVertexInputRate)desc.inputBindings[i].inputRate;
+            inputbindingDesc[i].inputRate = static_cast<VkVertexInputRate>(desc.inputBindings[i].inputRate);
             inputbindingDesc[i].stride = desc.inputBindings[i].stride;
         }
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -1048,7 +1022,7 @@ namespace RHI
         pipelineInfo.pDepthStencilState = &depthStencil; // Optional
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = (VkPipelineLayout)desc.rootSig->ID;
+        pipelineInfo.layout = static_cast<VkPipelineLayout>(desc.rootSig->ID);
         pipelineInfo.renderPass = nullptr;
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
@@ -1057,27 +1031,27 @@ namespace RHI
 
         vPSO->device = make_ptr(this);
 
-        VkResult res = vkCreateGraphicsPipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&vPSO->ID);
-        if(res < 0) return creation_result<PipelineStateObject>::err(marshall_error(res));
+        if(const VkResult res = vkCreateGraphicsPipelines(static_cast<VkDevice>(ID), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, reinterpret_cast<VkPipeline*>(&vPSO->ID));
+            res < 0) return creation_result<PipelineStateObject>::err(marshall_error(res));
         for(int i = 0; i < index; i++)
-            vkDestroyShaderModule((VkDevice)ID, modules[i], nullptr);
+            vkDestroyShaderModule(static_cast<VkDevice>(ID), modules[i], nullptr);
         return creation_result<PipelineStateObject>::ok(vPSO);
     }
-    creation_array_result<DescriptorSet> Device::CreateDescriptorSets(Ptr<DescriptorHeap> heap, std::uint32_t numDescriptorSets, Ptr<DescriptorSetLayout>* layouts)
+    creation_array_result<DescriptorSet> Device::CreateDescriptorSets(const Ptr<DescriptorHeap>& heap, std::uint32_t numDescriptorSets, Ptr<DescriptorSetLayout>* layouts)
     {
         std::vector<Ptr<DescriptorSet>> returnValues;
         VkDescriptorSetLayout vklayouts[5];
         for (uint32_t i = 0; i < numDescriptorSets; i++)
         {
-            vklayouts[i] = (VkDescriptorSetLayout)layouts[i]->ID;
+            vklayouts[i] = static_cast<VkDescriptorSetLayout>(layouts[i]->ID);
         }
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = (VkDescriptorPool)heap->ID;
+        allocInfo.descriptorPool = static_cast<VkDescriptorPool>(heap->ID);
         allocInfo.descriptorSetCount = numDescriptorSets;
         allocInfo.pSetLayouts = vklayouts;
         VkDescriptorSet descriptorSets[5];
-        VkResult res = vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, descriptorSets);
+        VkResult res = vkAllocateDescriptorSets(static_cast<VkDevice>(ID), &allocInfo, descriptorSets);
         if(res < 0) return creation_array_result<DescriptorSet>::err(marshall_error(res));
 
         for (uint32_t i = 0; i < numDescriptorSets; i++)
@@ -1092,13 +1066,13 @@ namespace RHI
     }
     Texture* Device::WrapNativeTexture(Internal_ID id)
     {
-        RHI::vTexture* vtex = new RHI::vTexture;
+        auto* vtex = new RHI::vTexture;
         vtex->ID = id;
         vtex->device = make_ptr(this);
 
         return vtex;
     }
-    void Device::UpdateDescriptorSet(std::uint32_t numDescs, DescriptorSetUpdateDesc* desc, Weak<DescriptorSet> sets)
+    void Device::UpdateDescriptorSet(std::uint32_t numDescs, const DescriptorSetUpdateDesc* desc, Weak<DescriptorSet> sets) const
     {
 
         VkWriteDescriptorSet writes[5]{};
@@ -1110,7 +1084,7 @@ namespace RHI
             {
             case(RHI::DescriptorType::CSTexture):
             {
-                Iinfo[i].imageView = (VkImageView)desc[i].textureInfos->texture->ID;
+                Iinfo[i].imageView = static_cast<VkImageView>(desc[i].textureInfos->texture->ID);
                 Iinfo[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                 Iinfo[i].sampler = nullptr;
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -1119,7 +1093,7 @@ namespace RHI
             }
             case(RHI::DescriptorType::CSBuffer):
             {
-                Binfo[i].buffer = (VkBuffer)desc[i].bufferInfos->buffer->ID;
+                Binfo[i].buffer = static_cast<VkBuffer>(desc[i].bufferInfos->buffer->ID);
                 Binfo[i].offset = desc[i].bufferInfos->offset;
                 Binfo[i].range = desc[i].bufferInfos->range;
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1128,7 +1102,7 @@ namespace RHI
             }
             case(RHI::DescriptorType::ConstantBuffer):
             {
-                Binfo[i].buffer = (VkBuffer)desc[i].bufferInfos->buffer->ID;
+                Binfo[i].buffer = static_cast<VkBuffer>(desc[i].bufferInfos->buffer->ID);
                 Binfo[i].offset = desc[i].bufferInfos->offset;
                 Binfo[i].range = desc[i].bufferInfos->range;
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1137,7 +1111,7 @@ namespace RHI
             }
             case(RHI::DescriptorType::SampledTexture):
             {
-                Iinfo[i].imageView = (VkImageView)desc[i].textureInfos->texture->ID;
+                Iinfo[i].imageView = static_cast<VkImageView>(desc[i].textureInfos->texture->ID);
                 Iinfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 Iinfo[i].sampler = nullptr;
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -1146,7 +1120,7 @@ namespace RHI
             }
             case(RHI::DescriptorType::StructuredBuffer):
             {
-                Binfo[i].buffer = (VkBuffer)desc[i].bufferInfos->buffer->ID;
+                Binfo[i].buffer = static_cast<VkBuffer>(desc[i].bufferInfos->buffer->ID);
                 Binfo[i].offset = desc[i].bufferInfos->offset;
                 Binfo[i].range = desc[i].bufferInfos->range;
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1156,7 +1130,7 @@ namespace RHI
             case(RHI::DescriptorType::Sampler):
             {
                 writes[i].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-                Iinfo[i].sampler = *(VkSampler*)desc[i].samplerInfos->heapHandle.ptr;
+                Iinfo[i].sampler = *static_cast<VkSampler*>(desc[i].samplerInfos->heapHandle.ptr);
                 Iinfo[i].imageView = VK_NULL_HANDLE;
                 writes[i].pImageInfo = &Iinfo[i];
             }
@@ -1164,28 +1138,28 @@ namespace RHI
                 break;
             }
             writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[i].dstSet = (VkDescriptorSet)sets->ID;
+            writes[i].dstSet = static_cast<VkDescriptorSet>(sets->ID);
             writes[i].dstBinding = desc[i].binding;
             writes[i].dstArrayElement = 0;
             writes[i].descriptorCount = desc->numDescriptors;
         }
-        vkUpdateDescriptorSets((VkDevice)ID, numDescs, writes, 0, nullptr);
+        vkUpdateDescriptorSets(static_cast<VkDevice>(ID), numDescs, writes, 0, nullptr);
 
     }
-    VkImageType ImageType(TextureType type)
+    auto ImageType(TextureType type) -> VkImageType
     {
         if (type == TextureType::Texture1D) return VK_IMAGE_TYPE_1D;
         if (type == TextureType::Texture2D) return VK_IMAGE_TYPE_2D;
         if (type == TextureType::Texture3D) return VK_IMAGE_TYPE_3D;
         return VK_IMAGE_TYPE_MAX_ENUM;
     }
-    VkImageTiling ImageTiling(TextureTilingMode mode)
+    VkImageTiling ImageTiling(const TextureTilingMode mode)
     {
         if (mode == TextureTilingMode::Linear) return VK_IMAGE_TILING_LINEAR;
         if (mode == TextureTilingMode::Optimal) return VK_IMAGE_TILING_OPTIMAL;
         return VK_IMAGE_TILING_MAX_ENUM;
     }
-    VkImageUsageFlags ImageUsage(RHI::TextureUsage usage)
+    VkImageUsageFlags ImageUsage(const RHI::TextureUsage usage)
     {
         VkImageUsageFlags flags = 0;
         if ((usage & RHI::TextureUsage::SampledImage) != RHI::TextureUsage::None)
@@ -1203,13 +1177,12 @@ namespace RHI
 
         return flags;
     }
-    creation_result<DynamicDescriptor> Device::CreateDynamicDescriptor(Ptr<DescriptorHeap> heap, DescriptorType type,ShaderStage stage, Weak<Buffer> buffer,uint32_t offset,uint32_t size)
+    creation_result<DynamicDescriptor> Device::CreateDynamicDescriptor(const Ptr<DescriptorHeap>& heap, const DescriptorType type, const ShaderStage stage, const Weak<Buffer> buffer, const uint32_t offset, const uint32_t size)
     {
         if((type != DescriptorType::ConstantBufferDynamic && type != DescriptorType::StructuredBufferDynamic) || heap.ptr == nullptr)
         {
             return creation_result<DynamicDescriptor>::err(CreationError::InvalidParameters);
         }
-        VkResult res;
         VkDescriptorSetLayoutBinding binding;
         binding.binding = 0;
         binding.descriptorCount = 1;
@@ -1217,42 +1190,42 @@ namespace RHI
         binding.pImmutableSamplers = nullptr;
         binding.stageFlags = VkShaderStage(stage);
         VkDescriptorSetLayoutCreateInfo info;//todo construct the set layout only once as part of the device
-        info.pNext = 0;
+        info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         info.bindingCount = 1;
         info.flags = 0;
         info.pBindings = &binding;
 
         Ptr<vDynamicDescriptor> vdescriptor(new vDynamicDescriptor);
-        res = vkCreateDescriptorSetLayout((VkDevice)ID, &info, nullptr, &vdescriptor->layout);
+        VkResult res = vkCreateDescriptorSetLayout(static_cast<VkDevice>(ID), &info, nullptr, &vdescriptor->layout);
 
         if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = (VkDescriptorPool)heap->ID;
+        allocInfo.descriptorPool = static_cast<VkDescriptorPool>(heap->ID);
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &vdescriptor->layout;
-        res = vkAllocateDescriptorSets((VkDevice)ID, &allocInfo, (VkDescriptorSet*)&vdescriptor->ID);
+        res = vkAllocateDescriptorSets(static_cast<VkDevice>(ID), &allocInfo, reinterpret_cast<VkDescriptorSet*>(&vdescriptor->ID));
 
         if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
 
         vdescriptor->device = make_ptr(this);
         vdescriptor->heap = heap.transform<vDescriptorHeap>();
         VkDescriptorBufferInfo binfo{};
-        binfo.buffer = (VkBuffer)buffer->ID;
+        binfo.buffer = static_cast<VkBuffer>(buffer->ID);
         binfo.offset = offset;
         binfo.range = size;
         VkWriteDescriptorSet write{};
         write.descriptorCount = 1;
         write.descriptorType = DescType(type);
-        write.dstSet = (VkDescriptorSet)vdescriptor->ID;
+        write.dstSet = static_cast<VkDescriptorSet>(vdescriptor->ID);
         write.pBufferInfo = &binfo;
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        vkUpdateDescriptorSets((VkDevice)ID, 1,&write, 0, nullptr);
+        vkUpdateDescriptorSets(static_cast<VkDevice>(ID), 1,&write, 0, nullptr);
         return creation_result<DynamicDescriptor>::ok(vdescriptor);
     }
-    creation_result<Texture> Device::CreateTexture(const TextureDesc& desc, Ptr<Heap> heap, HeapProperties* props, AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type)
+    creation_result<Texture> Device::CreateTexture(const TextureDesc& desc, const Ptr<Heap>& heap, const HeapProperties* props, const AutomaticAllocationInfo* automatic_info, const std::uint64_t offset, const ResourceType type)
     {
         Ptr<vTexture> vtexture(new vTexture);
         VkImageCreateInfo info{};
@@ -1281,30 +1254,30 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            VkResult res = vmaCreateImage(((vDevice*)this)->allocator, &info, &allocCreateInfo, (VkImage*)&vtexture->ID, &vtexture->vma_ID, nullptr);
+            VkResult res = vmaCreateImage(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkImage*>(&vtexture->ID), &vtexture->vma_ID, nullptr);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
             return creation_result<Texture>::ok(vtexture);
         }
-        VkResult res = vkCreateImage((VkDevice)ID, &info, nullptr, (VkImage*)&vtexture->ID);
+        VkResult res = vkCreateImage(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImage*>(&vtexture->ID));
         if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         if (type == ResourceType::Commited)
         {
-            MemoryReqirements req = GetTextureMemoryRequirements(desc);
-            auto r = CreateHeap(HeapDesc{req.size, *props}, nullptr);
+            auto [req_size, req_align, req_mem_type] = GetTextureMemoryRequirements(desc);
+            auto r = CreateHeap(HeapDesc{req_size, *props}, nullptr);
             if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Texture>{return nullptr;});
             vtexture->heap = r.value();
-            res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)vtexture->heap->ID, 0);
+            res = vkBindImageMemory(static_cast<VkDevice>(ID), static_cast<VkImage>(vtexture->ID), static_cast<VkDeviceMemory>(vtexture->heap->ID), 0);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
             vtexture->heap = heap;
-            res = vkBindImageMemory((VkDevice)ID, (VkImage)vtexture->ID, (VkDeviceMemory)heap->ID, offset);
+            res = vkBindImageMemory(static_cast<VkDevice>(ID), static_cast<VkImage>(vtexture->ID), static_cast<VkDeviceMemory>(heap->ID), offset);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
         return creation_result<Texture>::ok(vtexture);
     }
-    MemoryReqirements Device::GetTextureMemoryRequirements(const TextureDesc& desc)
+    MemoryRequirements Device::GetTextureMemoryRequirements(const TextureDesc& desc)
     {
         VkImageCreateInfo info{};
         info.arrayLayers = desc.type == TextureType::Texture3D ? 1 : desc.depthOrArraySize;
@@ -1325,11 +1298,12 @@ namespace RHI
         DeviceReq.pCreateInfo = &info;
         VkMemoryRequirements2 req{};
         req.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
-        vkGetDeviceImageMemoryRequirementsKHR((VkDevice)ID, &DeviceReq, &req);
-        MemoryReqirements requirements;
-        requirements.alignment = req.memoryRequirements.alignment;
-        requirements.size = req.memoryRequirements.size;
-        requirements.memoryTypeBits = req.memoryRequirements.memoryTypeBits;
+        vkGetDeviceImageMemoryRequirementsKHR(static_cast<VkDevice>(ID), &DeviceReq, &req);
+        const MemoryRequirements requirements{
+            .size = req.memoryRequirements.size,
+            .alignment = req.memoryRequirements.alignment,
+            .memoryTypeBits = req.memoryRequirements.memoryTypeBits,
+        };
         return requirements;
     }
     static VkImageViewType VkViewType(TextureViewType type)
@@ -1356,10 +1330,10 @@ namespace RHI
         info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
         info.flags = 0;
         info.format = FormatConv(desc.format);
-        info.image = (VkImage)desc.texture->ID;
+        info.image = static_cast<VkImage>(desc.texture->ID);
         info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         VkImageSubresourceRange range;
-        range.aspectMask = (VkImageAspectFlags)desc.range.imageAspect;
+        range.aspectMask = static_cast<VkImageAspectFlags>(desc.range.imageAspect);
         range.baseMipLevel =                   desc.range.IndexOrFirstMipLevel;
         range.baseArrayLayer =                 desc.range.FirstArraySlice;
         range.layerCount =                     desc.range.NumArraySlices;
@@ -1367,24 +1341,20 @@ namespace RHI
         info.subresourceRange = range;
         info.viewType = VkViewType(desc.type);
         Ptr<vTextureView> vtview(new vTextureView);
-        VkResult res = vkCreateImageView((VkDevice)ID, &info, nullptr, (VkImageView*)&vtview->ID);
+        VkResult res = vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImageView*>(&vtview->ID));
         if(res < 0) return creation_result<TextureView>::err(marshall_error(res));
         return creation_result<TextureView>::ok(vtview);
     }
-    VkSamplerAddressMode VkAddressMode(AddressMode mode)
+    VkSamplerAddressMode VkAddressMode(const AddressMode mode)
     {
+        using enum AddressMode;
         switch (mode)
         {
-        case RHI::AddressMode::Border: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-            break;
-        case RHI::AddressMode::Clamp: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            break;
-        case RHI::AddressMode::Mirror: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-            break;
-        case RHI::AddressMode::Wrap: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-            break;
+        case Border: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        case Clamp: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case Mirror: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        case Wrap: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         default: return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
-            break;
         }
     }
     VkFilter vkFilter(Filter mode)
@@ -1407,31 +1377,31 @@ namespace RHI
         info.compareOp = vkCompareFunc(desc.compareFunc);
         info.flags = 0;
         info.magFilter = vkFilter(desc.magFilter);
-        info.maxAnisotropy = desc.maxAnisotropy;
+        info.maxAnisotropy = static_cast<float>(desc.maxAnisotropy);
         info.maxLod = desc.maxLOD == FLT_MAX ? VK_LOD_CLAMP_NONE : desc.maxLOD;
         info.minFilter = vkFilter(desc.minFilter);
         info.minLod = desc.minLOD;
         info.mipLodBias = desc.mipLODBias;
         info.mipmapMode = vkMipMode(desc.mipFilter);
-        info.pNext = 0;
+        info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         info.unnormalizedCoordinates = VK_FALSE;
-        return marshall_error(vkCreateSampler((VkDevice)ID, &info, nullptr, (VkSampler*)heapHandle.ptr));
+        return marshall_error(vkCreateSampler(static_cast<VkDevice>(ID), &info, nullptr, static_cast<VkSampler*>(heapHandle.ptr)));
     }
     creation_result<ComputePipeline> Device::CreateComputePipeline(const ComputePipelineDesc& desc)
     {
         Ptr<vComputePipeline> vpipeline(new vComputePipeline);
         vpipeline->device = make_ptr(this);
         VkComputePipelineCreateInfo info{};
-        info.layout = (VkPipelineLayout)desc.rootSig->ID;
+        info.layout = static_cast<VkPipelineLayout>(desc.rootSig->ID);
         VkShaderModule module;
         if (desc.mode == ShaderMode::File) CreateShaderModule(std::string(desc.CS.data).c_str(), &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         else CreateShaderModule(desc.CS.data.data(), desc.CS.data.size(), &info.stage, VK_SHADER_STAGE_COMPUTE_BIT, 0, &module, ID);
         info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        VkResult res = vkCreateComputePipelines((VkDevice)ID, VK_NULL_HANDLE, 1, &info, nullptr, (VkPipeline*)&vpipeline->ID);
+        VkResult res = vkCreateComputePipelines(static_cast<VkDevice>(ID), VK_NULL_HANDLE, 1, &info, nullptr, reinterpret_cast<VkPipeline*>(&vpipeline->ID));
 
         if(res < 0) return creation_result<ComputePipeline>::err(marshall_error(res));
-        vkDestroyShaderModule((VkDevice)ID, module, nullptr);
+        vkDestroyShaderModule(static_cast<VkDevice>(ID), module, nullptr);
         return creation_result<ComputePipeline>::ok(vpipeline);
     }
     creation_result<DebugBuffer> Device::CreateDebugBuffer()
@@ -1439,7 +1409,7 @@ namespace RHI
         Ptr<vDebugBuffer> buff(new vDebugBuffer);
         VkAfterCrash_BufferCreateInfo info;
         info.markerCount = 1;
-        VkResult res = VkAfterCrash_CreateBuffer(((vDevice*)this)->acDevice, &info, (VkAfterCrash_Buffer*)&buff->ID,&buff->data);
+        const VkResult res = VkAfterCrash_CreateBuffer(reinterpret_cast<vDevice*>(this)->acDevice, &info, reinterpret_cast<VkAfterCrash_Buffer*>(&buff->ID),&buff->data);
         if(res < 0) return creation_result<DebugBuffer>::err(marshall_error(res));
         return creation_result<DebugBuffer>::ok(buff);
     }
