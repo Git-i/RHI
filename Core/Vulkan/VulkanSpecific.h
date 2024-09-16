@@ -30,16 +30,16 @@ namespace RHI
     CreationError marshall_error(VkResult r);
     std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface = RHI::Surface());
 
-    class vDevice : public Device
+    class vDevice final : public Device
     {
     public:
-        virtual ~vDevice() override
+        ~vDevice() override
         {
             vmaDestroyAllocator(allocator);
             VkAfterCrash_DestroyDevice(acDevice);
-            vkDestroyDevice((VkDevice)ID, nullptr);
+            vkDestroyDevice(static_cast<VkDevice>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DEVICE;
         }
@@ -49,7 +49,7 @@ namespace RHI
         VkAfterCrash_Device acDevice;
         std::uint32_t DefaultHeapIndex = UINT32_MAX;
         std::uint32_t UploadHeapIndex = UINT32_MAX;
-        std::uint32_t ReadbackHeapIndex = UINT32_MAX;
+        std::uint32_t ReadBackHeapIndex = UINT32_MAX;
         QueueFamilyIndices indices;
     };
 
@@ -61,18 +61,18 @@ namespace RHI
         std::uint64_t offset;
         std::uint64_t size;
         Ptr<Heap> heap;
-        VmaAllocation vma_ID = 0;//for automatic resources
+        VmaAllocation vma_ID = nullptr;//for automatic resources
     };
-    class vBuffer : public Buffer, public vResource
+    class vBuffer final : public Buffer, public vResource
     {
     public:
-        virtual ~vBuffer() override
+        ~vBuffer() override
         {
-            if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, (VkBuffer)ID, vma_ID);
-            else vkDestroyBuffer( (VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkBuffer)ID, nullptr);
+            if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkBuffer>(ID), vma_ID);
+            else vkDestroyBuffer( static_cast<VkDevice>((device.retrieve_as_forced<vDevice>())->ID), static_cast<VkBuffer>(ID), nullptr);
             vma_ID = nullptr; ID = nullptr;
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_BUFFER;
         }
@@ -83,42 +83,46 @@ namespace RHI
     public:
         ~vCommandAllocator() override
         {
-            if (((vCommandAllocator*)this)->m_pools.size())
+            if (((vCommandAllocator*)this)->m_pools.empty())
             {
-                vkFreeCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, m_pools.size(), (VkCommandBuffer*)m_pools.data());
+                vkFreeCommandBuffers(static_cast<VkDevice>((device.retrieve_as_forced<vDevice>())->ID), static_cast<VkCommandPool>(ID), m_pools.size(), reinterpret_cast<VkCommandBuffer*>(m_pools.data()));
             }
-            vkDestroyCommandPool((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)CommandAllocator::ID, nullptr);
+            vkDestroyCommandPool(static_cast<VkDevice>(device->ID), static_cast<VkCommandPool>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_COMMAND_POOL;
         }
         std::vector<Internal_ID> m_pools;
     };
 
-    class vTextureView : public TextureView
+    class vTextureView final : public TextureView
     {
-        public:
-        virtual int32_t GetType() override
+    public:
+        ~vTextureView() override
+        {
+            vkDestroyImageView(static_cast<VkDevice>(ID), static_cast<VkImageView>(ID), nullptr);
+        }
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_IMAGE_VIEW;
         }
     };
-    class vDebugBuffer : public DebugBuffer
+    class vDebugBuffer final : public DebugBuffer
     {
     public:
         uint32_t* data;
 
     };
-    class vCommandQueue : public CommandQueue
+    class vCommandQueue final : public CommandQueue
     {
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_QUEUE;
         }
     };
 
-    class vDescriptorHeap : public DescriptorHeap
+    class vDescriptorHeap final : public DescriptorHeap
     {
     public:
         ~vDescriptorHeap() override
@@ -138,73 +142,73 @@ namespace RHI
     public:
     ~vDynamicDescriptor() override
     {
-        if(layout) vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, layout, nullptr);
+        if(layout) vkDestroyDescriptorSetLayout(static_cast<VkDevice>(device->ID), layout, nullptr);
     };
     VkDescriptorSetLayout layout = nullptr;
     Ptr<vDescriptorHeap> heap = nullptr;
     };
-    class vFence : public Fence
+    class vFence final : public Fence
     {
     public:
-        virtual ~vFence() override
+        ~vFence() override
         {
-            vkDestroySemaphore((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSemaphore)Fence::ID, nullptr);
+            vkDestroySemaphore(static_cast<VkDevice>(device->ID), static_cast<VkSemaphore>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_SEMAPHORE;
         }
     };
-    class vHeap : public Heap
+    class vHeap final : public Heap
     {
     public:
-        virtual ~vHeap() override
+        ~vHeap() override
         {
-            vkFreeMemory((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDeviceMemory)Heap::ID, nullptr);
+            vkFreeMemory(static_cast<VkDevice>(device->ID), static_cast<VkDeviceMemory>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DEVICE_MEMORY;
         }
     };
-    class vDescriptorSetLayout : public DescriptorSetLayout
+    class vDescriptorSetLayout final : public DescriptorSetLayout
     {
     public:
-        virtual ~vDescriptorSetLayout() override
+        ~vDescriptorSetLayout() override
         {
-            vkDestroyDescriptorSetLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkDescriptorSetLayout)DescriptorSetLayout::ID, nullptr);
+            vkDestroyDescriptorSetLayout(static_cast<VkDevice>(device->ID), static_cast<VkDescriptorSetLayout>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
         }
     };
-    class vRootSignature : public RootSignature
+    class vRootSignature final : public RootSignature
     {
     public:
-        virtual ~vRootSignature() override
+        ~vRootSignature() override
         {
-            vkDestroyPipelineLayout((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipelineLayout)RootSignature::ID, nullptr);
+            vkDestroyPipelineLayout(static_cast<VkDevice>(device->ID), static_cast<VkPipelineLayout>(ID), nullptr);
 
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_PIPELINE_LAYOUT;
         }
         std::unordered_map<uint32_t, VkShaderStageFlags> pcBindingToStage;
     };
-    class vGraphicsCommandList : public GraphicsCommandList
+    class vGraphicsCommandList final : public GraphicsCommandList
     {
     public:
         ~vGraphicsCommandList() override
         {
-            if (auto pos = std::find(allocator->m_pools.begin(), allocator->m_pools.end(), ID); pos != allocator->m_pools.end())
+            if (const auto pos = std::ranges::find(allocator->m_pools, ID); pos != allocator->m_pools.end())
             {
                 allocator->m_pools.erase(pos);
             }
-            vkFreeCommandBuffers((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkCommandPool)allocator->ID, 1, (VkCommandBuffer*)&ID);
+            vkFreeCommandBuffers(static_cast<VkDevice>(device->ID), static_cast<VkCommandPool>(allocator->ID), 1, reinterpret_cast<VkCommandBuffer*>(&ID));
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_COMMAND_BUFFER;
         }
@@ -212,60 +216,60 @@ namespace RHI
         Ptr<vCommandAllocator> allocator;
         Weak<vRootSignature> currentRS = nullptr;
     };
-    class vPipelineStateObject : public PipelineStateObject
+    class vPipelineStateObject final : public PipelineStateObject
     {
     public:
-        virtual ~vPipelineStateObject() override
+        ~vPipelineStateObject() override
         {
-            vkDestroyPipeline((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipeline)PipelineStateObject::ID, nullptr);
+            vkDestroyPipeline(static_cast<VkDevice>(device->ID), static_cast<VkPipeline>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_PIPELINE;
         }
     };
-    class vComputePipeline : public ComputePipeline
+    class vComputePipeline final : public ComputePipeline
     {
     public:
-        virtual ~vComputePipeline() override
+        ~vComputePipeline() override
         {
-            vkDestroyPipeline((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkPipeline)ComputePipeline::ID, nullptr);
+            vkDestroyPipeline(static_cast<VkDevice>(device->ID), static_cast<VkPipeline>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_PIPELINE;
         }
     };
-    class vDescriptorSet : public DescriptorSet
+    class vDescriptorSet final : public DescriptorSet
     {
     public:
         Ptr<vDescriptorSetLayout> layout;
         Ptr<vDescriptorHeap> heap;
     };
-    class vTexture : public Texture, public vResource
+    class vTexture final : public Texture, public vResource
     {
     public:
-        virtual ~vTexture() override
+        ~vTexture() override
         {
-            if(vma_ID) vmaDestroyImage((device.retrieve_as_forced<vDevice>())->allocator, (VkImage)ID, vma_ID);
-            else vkDestroyImage((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkImage)Texture::ID, nullptr);
+            if(vma_ID) vmaDestroyImage(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkImage>(ID), vma_ID);
+            else vkDestroyImage(static_cast<VkDevice>(device->ID), static_cast<VkImage>(Texture::ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_IMAGE;
         }
     };
-    class vInstance : public Instance
+    class vInstance final : public Instance
     {
     public:
         static vInstance* current;
         std::function<void(LogLevel, std::string_view)> logCallback;
-        VkDebugUtilsMessengerEXT messanger;
-        virtual ~vInstance() override
+        VkDebugUtilsMessengerEXT messenger;
+        ~vInstance() override
         {
-            vkDestroyInstance((VkInstance)Instance::ID, nullptr);
+            vkDestroyInstance(static_cast<VkInstance>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_INSTANCE;
         }
@@ -273,14 +277,14 @@ namespace RHI
     class vPhysicalDevice : public PhysicalDevice
     {
     };
-    class vSwapChain : public SwapChain
+    class vSwapChain final : public SwapChain
     {
     public:
-        virtual ~vSwapChain() override
+        ~vSwapChain() override
         {
-            vkDestroySwapchainKHR((VkDevice)(device.retrieve_as_forced<vDevice>())->ID, (VkSwapchainKHR)SwapChain::ID, nullptr);
+            vkDestroySwapchainKHR(static_cast<VkDevice>(device->ID), static_cast<VkSwapchainKHR>(ID), nullptr);
         }
-        virtual int32_t GetType() override
+        int32_t GetType() override
         {
             return VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         }
@@ -289,12 +293,12 @@ namespace RHI
         VkFence imageAcquired;
         VkQueue PresentQueue_ID;
     };
-    class vShaderReflection : public ShaderReflection
+    class vShaderReflection final : public ShaderReflection
     {
     public:
-        virtual ~vShaderReflection() override
+        ~vShaderReflection() override
         {
-            delete ((SpvReflectShaderModule*)Object::ID);
+            delete static_cast<SpvReflectShaderModule*>(ID);
         }
     };
     void log(LogLevel lvl, std::string_view msg);

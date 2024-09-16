@@ -56,7 +56,7 @@ static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
     }
     device->DefaultHeapIndex = DefaultHeap;
     device->UploadHeapIndex = UploadHeap;
-    device->ReadbackHeapIndex = ReadbackHeap;
+    device->ReadBackHeapIndex = ReadbackHeap;
 }
 
 namespace RHI
@@ -633,14 +633,14 @@ namespace RHI
                 if(usedFallback)*usedFallback = true;
                 if (desc.props.FallbackType == HeapType::Default)  MemIndex = reinterpret_cast<vDevice*>(this)->DefaultHeapIndex;
                 if (desc.props.FallbackType == HeapType::Upload)   MemIndex = reinterpret_cast<vDevice*>(this)->UploadHeapIndex;
-                if (desc.props.FallbackType == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadbackHeapIndex;
+                if (desc.props.FallbackType == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadBackHeapIndex;
             }
         }
         else
         {
             if (desc.props.type == HeapType::Default)  MemIndex = reinterpret_cast<vDevice*>(this)->DefaultHeapIndex;
             if (desc.props.type == HeapType::Upload)   MemIndex = reinterpret_cast<vDevice*>(this)->UploadHeapIndex;
-            if (desc.props.type == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadbackHeapIndex;
+            if (desc.props.type == HeapType::ReadBack) MemIndex = reinterpret_cast<vDevice*>(this)->ReadBackHeapIndex;
         }
         allocInfo.memoryTypeIndex = MemIndex;
         VkResult res = vkAllocateMemory(static_cast<VkDevice>(ID), &allocInfo, nullptr, reinterpret_cast<VkDeviceMemory*>(&vheap->ID));
