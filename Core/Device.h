@@ -45,7 +45,7 @@ namespace RHI
 		creation_result<DynamicDescriptor> CreateDynamicDescriptor(const Ptr<DescriptorHeap>& heap, DescriptorType type, ShaderStage stage, Weak<Buffer> buffer,uint32_t offset, uint32_t size);
 		creation_result<TextureView> CreateTextureView(const TextureViewDesc& desc);
 		creation_array_result<DescriptorSet> CreateDescriptorSets(const Ptr<DescriptorHeap>& heap, std::uint32_t numDescriptorSets, Ptr<DescriptorSetLayout>* layouts);
-		void UpdateDescriptorSet(std::uint32_t numDescs, const DescriptorSetUpdateDesc* desc, Weak<DescriptorSet> set) const;
+		void UpdateDescriptorSet(std::span<const DescriptorSetUpdateDesc> descs, Weak<DescriptorSet> set) const;
 		creation_result<Texture> CreateTexture(const TextureDesc& desc, const Ptr<Heap>& heap, const HeapProperties* props, const AutomaticAllocationInfo* automatic_info,std::uint64_t offset, ResourceType type);
 		[[nodiscard]] CreationError CreateRenderTargetView(Weak<Texture> texture, const RenderTargetViewDesc& desc, CPU_HANDLE heapHandle) const;
 		[[nodiscard]] CreationError CreateDepthStencilView(Weak<Texture> texture, const DepthStencilViewDesc& desc, CPU_HANDLE heapHandle) const;

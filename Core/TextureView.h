@@ -13,9 +13,9 @@ namespace RHI
 	{
 		TextureViewType type;
 		Format format;
-		//TODO 4 component mapping
 		Weak<Texture> texture;
 		SubResourceRange range;
+		//TODO 4 component mapping
 	};
 	class TextureView : public Object
 	{

@@ -1078,12 +1078,13 @@ namespace RHI
 
         return vtex;
     }
-    void Device::UpdateDescriptorSet(std::uint32_t numDescs, const DescriptorSetUpdateDesc* desc, Weak<DescriptorSet> sets) const
+    void Device::UpdateDescriptorSet(std::span<const DescriptorSetUpdateDesc> desc, Weak<DescriptorSet> sets) const
     {
 
         VkWriteDescriptorSet writes[5]{};
         VkDescriptorBufferInfo Binfo[5]{ };
         VkDescriptorImageInfo Iinfo[5]{ };
+        uint32_t numDescs = desc.size();
         for(uint32_t i = 0; i < numDescs; i++)
         {
             switch (desc[i].type)
@@ -1147,7 +1148,7 @@ namespace RHI
             writes[i].dstSet = static_cast<VkDescriptorSet>(sets->ID);
             writes[i].dstBinding = desc[i].binding;
             writes[i].dstArrayElement = 0;
-            writes[i].descriptorCount = desc->numDescriptors;
+            writes[i].descriptorCount = desc[i].numDescriptors;
         }
         vkUpdateDescriptorSets(static_cast<VkDevice>(ID), numDescs, writes, 0, nullptr);
 
