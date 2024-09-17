@@ -34,7 +34,6 @@ namespace RHI
 		CPUPageProperty pageProperty;
 		MemoryLevel memoryLevel;
 		HeapType FallbackType;
-		HeapProperties() { memset(this, 0, sizeof(HeapProperties)); };
 	};
 	struct RHI_API HeapDesc
 	{

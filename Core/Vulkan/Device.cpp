@@ -432,11 +432,17 @@ namespace RHI
         {
             vdescriptorHeap->ID = new VkImageView[desc.poolSizes->numDescriptors];
             vdescriptorHeap->type = RHI::DescriptorType::RTV;//this is purely for correct deletion
+            const auto begin = static_cast<VkImageView*>(vdescriptorHeap->ID);
+            for (auto& elem : std::ranges::subrange(begin, begin + desc.poolSizes->numDescriptors)) elem = nullptr;
+            vdescriptorHeap->num_descriptors = desc.poolSizes->numDescriptors;
         }
         else if (desc.poolSizes->type == DescriptorType::Sampler)
         {
             vdescriptorHeap->ID = new VkSampler[desc.poolSizes->numDescriptors];
-            vdescriptorHeap->type = RHI::DescriptorType::RTV;
+            vdescriptorHeap->type = RHI::DescriptorType::Sampler;
+            const auto begin = static_cast<VkSampler*>(vdescriptorHeap->ID);
+            for (auto& elem : std::ranges::subrange(begin, begin + desc.poolSizes->numDescriptors)) elem = nullptr;
+            vdescriptorHeap->num_descriptors = desc.poolSizes->numDescriptors;
         }
         else
         {
@@ -455,8 +461,8 @@ namespace RHI
             poolInfo.maxSets = desc.maxDescriptorSets;
 
             res = vkCreateDescriptorPool(static_cast<VkDevice>(ID), &poolInfo, nullptr, reinterpret_cast<VkDescriptorPool*>(&vdescriptorHeap->ID));
-            vdescriptorHeap->device = make_ptr(this);
         }
+        vdescriptorHeap->device = make_ptr(this);
         if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
         return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
     }
@@ -1341,8 +1347,9 @@ namespace RHI
         info.subresourceRange = range;
         info.viewType = VkViewType(desc.type);
         Ptr<vTextureView> vtview(new vTextureView);
-        VkResult res = vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImageView*>(&vtview->ID));
-        if(res < 0) return creation_result<TextureView>::err(marshall_error(res));
+        vtview->device = make_ptr(this);
+        if(const VkResult res = vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImageView*>(&vtview->ID)); res < 0)
+            return creation_result<TextureView>::err(marshall_error(res));
         return creation_result<TextureView>::ok(vtview);
     }
     VkSamplerAddressMode VkAddressMode(const AddressMode mode)

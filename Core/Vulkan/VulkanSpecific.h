@@ -127,14 +127,31 @@ namespace RHI
     public:
         ~vDescriptorHeap() override
         {
-            if(type == DescriptorType::RTV) delete[] static_cast<VkImageView*>(ID);
-            else if(type == DescriptorType::Sampler) delete[] static_cast<VkSampler*>(ID);
+            if(type == DescriptorType::RTV)
+            {
+                auto begin = static_cast<VkImageView*>(ID);
+                for (const auto& elem : std::ranges::subrange(begin, begin + num_descriptors))
+                {
+                    if(elem) vkDestroyImageView(static_cast<VkDevice>(ID), elem, nullptr);
+                }
+                delete[] static_cast<VkImageView*>(ID);
+            }
+            else if(type == DescriptorType::Sampler)
+            {
+                auto begin = static_cast<VkSampler*>(ID);
+                for (const auto& elem : std::ranges::subrange(begin, begin + num_descriptors))
+                {
+                    if(elem) vkDestroySampler(static_cast<VkDevice>(ID), elem, nullptr);
+                }
+                delete[] static_cast<VkSampler*>(ID);
+            }
             else vkDestroyDescriptorPool(static_cast<VkDevice>(device.retrieve_as_forced<vDevice>()->ID), static_cast<VkDescriptorPool>(ID), nullptr);
         }
         int32_t GetType() override
         {
             return VK_OBJECT_TYPE_DESCRIPTOR_POOL;
         }
+        uint32_t num_descriptors;
         DescriptorType type;
     };
     class vDynamicDescriptor final: public DynamicDescriptor
