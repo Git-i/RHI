@@ -63,6 +63,9 @@ namespace RHI
 		creation_result<Texture> GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index);
 		uint32_t GetConstantBufferAlignment();
 		RESULT GetMemorySharingCapabilites();
+		void DestroySampler(CPU_HANDLE handle) const;
+		void DestroyRenderTargetView(CPU_HANDLE handle) const;
+		void DestroyDepthStencilView(CPU_HANDLE handle) const;
 		RESULT ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle);
 		//This is not staying
 		RESULT QueueWaitIdle(Weak<CommandQueue> queue);

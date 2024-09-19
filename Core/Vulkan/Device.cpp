@@ -314,6 +314,27 @@ namespace RHI
         return 0;
     }
 
+    void Device::DestroySampler(const CPU_HANDLE handle) const
+    {
+        if(handle.ptr == nullptr) log(LogLevel::Warn, "Destroying already invalid sampler");
+        auto& sampler = *static_cast<VkSampler*>(handle.ptr);
+        vkDestroySampler(static_cast<VkDevice>(ID), sampler, nullptr);
+        sampler = nullptr;
+    }
+
+    void Device::DestroyRenderTargetView(const CPU_HANDLE handle) const
+    {
+        if(handle.ptr == nullptr) log(LogLevel::Warn, "Destroying already invalid view");
+        auto& view = *static_cast<VkImageView*>(handle.ptr);
+        vkDestroyImageView(static_cast<VkDevice>(ID), view, nullptr);
+        view = nullptr;
+    }
+
+    void Device::DestroyDepthStencilView(const CPU_HANDLE handle) const
+    {
+        DestroyRenderTargetView(handle);
+    }
+
     RESULT Device::ExportTexture(Texture* texture, ExportOptions options, MemHandleT* handle)
     {
         auto* vtex = reinterpret_cast<vTexture*>(texture);
@@ -1394,6 +1415,7 @@ namespace RHI
         info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         info.unnormalizedCoordinates = VK_FALSE;
+        if(heapHandle.val) log(LogLevel::Warn, "Possibly alive sampler overwritten by create sampler");
         return marshall_error(vkCreateSampler(static_cast<VkDevice>(ID), &info, nullptr, static_cast<VkSampler*>(heapHandle.ptr)));
     }
     creation_result<ComputePipeline> Device::CreateComputePipeline(const ComputePipelineDesc& desc)
