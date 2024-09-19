@@ -38,18 +38,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
   ((sizeof(a) / sizeof(*(a))) / \
   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
 #endif
-extern "C"
+
+namespace RHI
 {
-	RESULT RHI_API RHICreateInstance(RHI::Instance** instance)
+	creation_result<Instance> Instance::Create()
 	{
-		if(RHI::vInstance::current)
+		if(RHI::vInstance::current.IsValid())
 		{
-			return -1;
+			return ezr::err(CreationError::InstanceAlreadyExists);
 		}
-		RHI::vInstance* vinstance = new RHI::vInstance;
-		*instance = vinstance;
+		Ptr<vInstance> vinstance(new RHI::vInstance);
 		VkResult res = volkInitialize();
-		if(res != VK_SUCCESS) return res;
+		if(res != VK_SUCCESS) return ezr::err(marshall_error(res));
 		VkValidationFeatureEnableEXT enabled[] =
 		{
 			//VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
@@ -86,6 +86,10 @@ extern "C"
 		info.ppEnabledExtensionNames = extensionName.data();
 		info.pApplicationInfo = &appInfo;
 		res = vkCreateInstance(&info, nullptr, (VkInstance*)&vinstance->ID);
+		if(res < 0)
+		{
+			return ezr::err(RHI::marshall_error(res));
+		}
 		volkLoadInstance((VkInstance)vinstance->ID);
 		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -95,11 +99,8 @@ extern "C"
 		createInfo.pUserData = nullptr; // Optional
 		vkCreateDebugUtilsMessengerEXT((VkInstance)vinstance->ID, &createInfo, nullptr, &vinstance->messenger);
 		RHI::vInstance::current = vinstance;
-		return res;
+		return creation_result<Instance>::ok(std::move(vinstance));
 	}
-}
-namespace RHI
-{
 	RHI::Instance* Instance::FromNativeHandle(Internal_ID id)
 	{
 		RHI::vInstance* inst = new RHI::vInstance;

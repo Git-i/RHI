@@ -25,10 +25,7 @@ namespace RHI
 		RESULT GetPhysicalDevice(uint32_t id, PhysicalDevice** device);
 		static RHI::Instance* FromNativeHandle(Internal_ID id);
 		creation_result<SwapChain> CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* device, Ptr<Device> pDevice, Weak<CommandQueue> pCommandQueue);
+		static creation_result<Instance> Create();
 	};
 
-}
-extern "C"
-{
-	RESULT RHI_API RHICreateInstance(RHI::Instance**instance);
 }

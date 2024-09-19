@@ -382,7 +382,8 @@ namespace RHI
 		OutOfHeapMemory = 5,
 		FileNotFound,
 		IncompatibleShader,
-		CommandQueueNotAvailable
+		CommandQueueNotAvailable,
+		InstanceAlreadyExists
 	};
 	template<typename T>
 	using creation_result = ezr::result<Ptr<T>, CreationError>;

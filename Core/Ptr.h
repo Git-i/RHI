@@ -2,11 +2,12 @@
 #include <cstdint>
 #include <cstddef>
 #include <type_traits>
+#include <concepts>
 namespace RHI
 {
     template<typename T> class Weak;
     template <typename T>
-    class Ptr
+    class Ptr 
     {
     public:
         Ptr() noexcept

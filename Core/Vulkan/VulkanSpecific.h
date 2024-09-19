@@ -279,7 +279,7 @@ namespace RHI
     class vInstance final : public Instance
     {
     public:
-        static vInstance* current;
+        inline static Weak<vInstance> current = nullptr;
         std::function<void(LogLevel, std::string_view)> logCallback;
         VkDebugUtilsMessengerEXT messenger;
         ~vInstance() override

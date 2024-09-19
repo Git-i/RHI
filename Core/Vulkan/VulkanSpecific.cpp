@@ -3,8 +3,7 @@
 #include "volk.h"
 namespace RHI
 {
-    
-    vInstance* vInstance::current = nullptr;
+
     void log(LogLevel lvl, std::string_view msg)
     {
         if(vInstance::current->logCallback)
@@ -12,9 +11,9 @@ namespace RHI
             vInstance::current->logCallback(lvl, msg);
         }
     }
-    VkFormat FormatConv(RHI::Format format)
+    VkFormat FormatConv(const RHI::Format format)
     {
-        return (VkFormat)FormatToVk(format);
+        return static_cast<VkFormat>(FormatToVk(format));
     }
     CreationError marshall_error(VkResult r)
     {
