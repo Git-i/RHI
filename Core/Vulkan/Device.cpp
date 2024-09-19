@@ -861,7 +861,7 @@ namespace RHI
         int index = 0;
         auto createShader = [&](const ShaderCode& code, const VkShaderStageFlagBits bits){
             CreationError err = CreationError::None;
-            if(code.data.empty())
+            if(!code.data.empty())
             {
                 if(desc.shaderMode == File) err = CreateShaderModule(std::string(code.data).c_str(), ShaderpipelineInfo, bits, index, modules, ID);
                 else err = CreateShaderModule(code.data.data(), code.data.size(), ShaderpipelineInfo, bits, index, modules, ID);

@@ -101,13 +101,13 @@ namespace RHI
 		RHI::vInstance::current = vinstance;
 		return creation_result<Instance>::ok(std::move(vinstance));
 	}
-	RHI::Instance* Instance::FromNativeHandle(Internal_ID id)
+	creation_result<RHI::Instance> Instance::FromNativeHandle(Internal_ID id)
 	{
-		RHI::vInstance* inst = new RHI::vInstance;
+		RHI::Ptr<RHI::vInstance> inst(new RHI::vInstance);
 		inst->ID = id;
 		volkInitialize();
 		volkLoadInstance((VkInstance)inst->ID);
-		return inst;
+		return creation_result<Instance>::ok(inst);
 	}
 	RESULT Instance::GetPhysicalDevice(uint32_t id, PhysicalDevice** device)
 	{
