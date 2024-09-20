@@ -62,8 +62,9 @@ static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 namespace RHI
 {
     ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-    Device::Create(PhysicalDevice* PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, Internal_ID instance, DeviceCreateFlags flags)
+    Device::Create(PhysicalDevice* PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, const Ptr<Instance>& inst, DeviceCreateFlags flags)
     {
+        const auto instance = static_cast<VkInstance>(inst->ID);
         uint32_t numCommandQueues = commandQueueInfos.size();
         auto vkPhysicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         VkPhysicalDeviceMemoryProperties memProps;
@@ -194,7 +195,7 @@ namespace RHI
         VmaAllocatorCreateInfo vmaInfo{};
         vmaInfo.device = static_cast<VkDevice>(vdevice->ID);
         vmaInfo.flags = 0; //probably have error checking
-        vmaInfo.instance = static_cast<VkInstance>(instance);
+        vmaInfo.instance = instance;
         vmaInfo.physicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         vmaInfo.pVulkanFunctions = nullptr;
         vmaInfo.pTypeExternalMemoryHandleTypes = (flags & RHI::DeviceCreateFlags::ShareAutomaticMemory) != RHI::DeviceCreateFlags::None ? ext_mem:nullptr;//
@@ -206,7 +207,8 @@ namespace RHI
         acInfo.vkDevice = static_cast<VkDevice>(vdevice->ID);
         acInfo.vkPhysicalDevice = static_cast<VkPhysicalDevice>(PhysicalDevice->ID);
         VkAfterCrash_CreateDevice(&acInfo, &vdevice->acDevice);
-        return ezr::ok(std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>{vdevice.transform<Device>(), vqueue});
+        inst->Hold(); //prevent destroying instance before device
+        return ezr::ok(std::pair{vdevice.transform<Device>(), vqueue});
     }
     creation_result<Device> Device::FromNativeHandle(Internal_ID id, Internal_ID phys_device, Internal_ID instance, const QueueFamilyIndices& indices)
     {

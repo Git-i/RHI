@@ -29,7 +29,21 @@ namespace RHI
 
     CreationError marshall_error(VkResult r);
     std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface = RHI::Surface());
-
+    class vInstance final : public Instance
+    {
+    public:
+        inline static Weak<vInstance> current = nullptr;
+        std::function<void(LogLevel, std::string_view)> logCallback;
+        VkDebugUtilsMessengerEXT messenger;
+        ~vInstance() override
+        {
+            vkDestroyInstance(static_cast<VkInstance>(ID), nullptr);
+        }
+        int32_t GetType() override
+        {
+            return VK_OBJECT_TYPE_INSTANCE;
+        }
+    };
     class vDevice final : public Device
     {
     public:
@@ -38,6 +52,7 @@ namespace RHI
             vmaDestroyAllocator(allocator);
             VkAfterCrash_DestroyDevice(acDevice);
             vkDestroyDevice(static_cast<VkDevice>(ID), nullptr);
+            vInstance::current->Release();
         }
         int32_t GetType() override
         {
@@ -83,9 +98,9 @@ namespace RHI
     public:
         ~vCommandAllocator() override
         {
-            if (((vCommandAllocator*)this)->m_pools.empty())
+            if (!this->m_pools.empty())
             {
-                vkFreeCommandBuffers(static_cast<VkDevice>((device.retrieve_as_forced<vDevice>())->ID), static_cast<VkCommandPool>(ID), m_pools.size(), reinterpret_cast<VkCommandBuffer*>(m_pools.data()));
+                vkFreeCommandBuffers(static_cast<VkDevice>(device->ID), static_cast<VkCommandPool>(ID), m_pools.size(), reinterpret_cast<VkCommandBuffer*>(m_pools.data()));
             }
             vkDestroyCommandPool(static_cast<VkDevice>(device->ID), static_cast<VkCommandPool>(ID), nullptr);
         }
@@ -276,21 +291,7 @@ namespace RHI
             return VK_OBJECT_TYPE_IMAGE;
         }
     };
-    class vInstance final : public Instance
-    {
-    public:
-        inline static Weak<vInstance> current = nullptr;
-        std::function<void(LogLevel, std::string_view)> logCallback;
-        VkDebugUtilsMessengerEXT messenger;
-        ~vInstance() override
-        {
-            vkDestroyInstance(static_cast<VkInstance>(ID), nullptr);
-        }
-        int32_t GetType() override
-        {
-            return VK_OBJECT_TYPE_INSTANCE;
-        }
-    };
+
     class vPhysicalDevice : public PhysicalDevice
     {
     };

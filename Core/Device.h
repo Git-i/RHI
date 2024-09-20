@@ -21,6 +21,7 @@
 
 namespace RHI
 {
+	class Instance;
 #ifdef WIN32
 	typedef HANDLE MemHandleT;
 #else
@@ -73,7 +74,7 @@ namespace RHI
 		RHI::Texture* WrapNativeTexture(Internal_ID id);
 
 		static ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-	       Create(RHI::PhysicalDevice* PhysicalDevice, std::span<RHI::CommandQueueDesc> commandQueueInfos, Internal_ID instance, RHI::DeviceCreateFlags flags = RHI::DeviceCreateFlags::None);
+	       Create(RHI::PhysicalDevice* PhysicalDevice, std::span<RHI::CommandQueueDesc> commandQueueInfos, const Ptr<Instance>& instance, RHI::DeviceCreateFlags flags = RHI::DeviceCreateFlags::None);
 	};
 	const RESULT& vkCompareFunc();
 }
