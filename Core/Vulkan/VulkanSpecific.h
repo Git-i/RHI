@@ -22,6 +22,7 @@
 #include "VulkanAfterCrash.h"
 #include <algorithm>//for std::find
 #include <unordered_map>
+#include <variant>
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
@@ -73,16 +74,17 @@ namespace RHI
     class vResource
     {
     public:
-        union
+        struct PlacedData
         {
-            struct
-            {
-                std::uint64_t offset;
-                std::uint64_t size;
-                Ptr<Heap> heap;
-            };
-            VmaAllocation vma_ID = nullptr;//for automatic resources
+            std::uint64_t offset;
+            std::uint64_t size;
+            Ptr<Heap> heap;
         };
+        std::variant<PlacedData, VmaAllocation> allocation;
+        [[nodiscard]] bool is_auto() const { return std::holds_alternative<VmaAllocation>(allocation);}
+        [[nodiscard]] VmaAllocation& vma_allocation() { return std::get<1>(allocation);}
+        [[nodiscard]] PlacedData& placed_data() { return std::get<0>(allocation);}
+
         uint8_t* mapped_data = nullptr;
         std::atomic<uint32_t> map_ref = 0;
     };
@@ -91,9 +93,9 @@ namespace RHI
     public:
         ~vBuffer() override
         {
-            if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkBuffer>(ID), vma_ID);
+            if(is_auto()) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkBuffer>(ID), vma_allocation());
             else vkDestroyBuffer( static_cast<VkDevice>(device->ID), static_cast<VkBuffer>(ID), nullptr);
-            vma_ID = nullptr; ID = nullptr;
+            ID = nullptr;
         }
         int32_t GetType() override
         {
@@ -291,7 +293,7 @@ namespace RHI
     public:
         ~vTexture() override
         {
-            if(vma_ID) vmaDestroyImage(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkImage>(ID), vma_ID);
+            if(is_auto()) vmaDestroyImage(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkImage>(ID), vma_allocation());
             else vkDestroyImage(static_cast<VkDevice>(device->ID), static_cast<VkImage>(Texture::ID), nullptr);
         }
         int32_t GetType() override

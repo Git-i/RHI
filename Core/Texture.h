@@ -16,7 +16,7 @@ namespace RHI
 		*/
 		ezr::result<void*, MappingError> Map(Aspect, uint32_t mip, uint32_t layer);
 		void* MapFromHeapPtr(void* heap_ptr, uint32_t offset, Aspect, uint32_t mip, uint32_t layer);
-		void UnMap();
+		void UnMap(Aspect, uint32_t mip, uint32_t layer);
 	};
 
 	

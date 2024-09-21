@@ -350,7 +350,7 @@ namespace RHI
         #endif
         VkMemoryGetFdInfoKHR info;
         info.handleType = MemFlags(options);
-        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : reinterpret_cast<VkDeviceMemory>(vtex->heap.Get());
+        info.memory = vtex->is_auto() ? vtex->vma_allocation()->GetMemory() : reinterpret_cast<VkDeviceMemory>(vtex->placed_data().heap.Get());
         info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         return vkGetMemoryFdKHR(static_cast<VkDevice>(ID),&info,handle);
@@ -581,6 +581,7 @@ namespace RHI
         vbuffer->device = make_ptr(this);
         if (type == ResourceType::Automatic)
         {
+            vbuffer->allocation = nullptr;
             VmaAllocationCreateInfo allocCreateInfo{};
             allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             allocCreateInfo.flags = 0;
@@ -588,13 +589,14 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            VkResult res = vmaCreateBuffer(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkBuffer*>(&vbuffer->ID), &vbuffer->vma_ID, nullptr);
+            VkResult res = vmaCreateBuffer(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkBuffer*>(&vbuffer->ID), &vbuffer->vma_allocation(), nullptr);
 
             if(res < 0) creation_result<Buffer>::err(marshall_error(res));
             return creation_result<Buffer>::ok(vbuffer);
         }
-        vbuffer->offset = offset;
-        vbuffer->size = desc.size;
+        vbuffer->allocation = vResource::PlacedData();
+        vbuffer->placed_data().offset = offset;
+        vbuffer->placed_data().size = desc.size;
         VkResult res = vkCreateBuffer(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkBuffer*>(&vbuffer->ID));
         if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         if (type == ResourceType::Commited)
@@ -602,13 +604,13 @@ namespace RHI
             MemoryRequirements req = GetBufferMemoryRequirements(desc);
             auto r = CreateHeap(HeapDesc{req.size, *props}, nullptr);
             if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Buffer>{return nullptr;});
-            vbuffer->heap = r.value();
-            res = vkBindBufferMemory(static_cast<VkDevice>(ID), static_cast<VkBuffer>(vbuffer->ID), static_cast<VkDeviceMemory>(vbuffer->heap->ID), 0);
+            vbuffer->placed_data().heap = r.value();
+            res = vkBindBufferMemory(static_cast<VkDevice>(ID), static_cast<VkBuffer>(vbuffer->ID), static_cast<VkDeviceMemory>(vbuffer->placed_data().heap->ID), 0);
             if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
-            vbuffer->heap = heap;
+            vbuffer->placed_data().heap = heap;
             res = vkBindBufferMemory(static_cast<VkDevice>(ID), static_cast<VkBuffer>(vbuffer->ID), static_cast<VkDeviceMemory>(heap->ID), offset);
             if(res < 0) return creation_result<Buffer>::err(marshall_error(res));
         }
@@ -1277,6 +1279,7 @@ namespace RHI
         vtexture->device = make_ptr(this);
         if (type == ResourceType::Automatic)
         {
+            vtexture->allocation = nullptr;
             VmaAllocationCreateInfo allocCreateInfo{};
             allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             allocCreateInfo.flags = 0;
@@ -1284,10 +1287,11 @@ namespace RHI
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Random) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
             allocCreateInfo.flags |=
                 (automatic_info->access_mode == AutomaticAllocationCPUAccessMode::Sequential) ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
-            VkResult res = vmaCreateImage(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkImage*>(&vtexture->ID), &vtexture->vma_ID, nullptr);
+            VkResult res = vmaCreateImage(reinterpret_cast<vDevice*>(this)->allocator, &info, &allocCreateInfo, reinterpret_cast<VkImage*>(&vtexture->ID), &vtexture->vma_allocation(), nullptr);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
             return creation_result<Texture>::ok(vtexture);
         }
+        vtexture->allocation = vResource::PlacedData();
         VkResult res = vkCreateImage(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImage*>(&vtexture->ID));
         if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         if (type == ResourceType::Commited)
@@ -1295,13 +1299,13 @@ namespace RHI
             auto [req_size, req_align, req_mem_type] = GetTextureMemoryRequirements(desc);
             auto r = CreateHeap(HeapDesc{req_size, *props}, nullptr);
             if(r.is_err()) return r.transform([](Ptr<Heap>&)->Ptr<Texture>{return nullptr;});
-            vtexture->heap = r.value();
-            res = vkBindImageMemory(static_cast<VkDevice>(ID), static_cast<VkImage>(vtexture->ID), static_cast<VkDeviceMemory>(vtexture->heap->ID), 0);
+            vtexture->placed_data().heap = r.value();
+            res = vkBindImageMemory(static_cast<VkDevice>(ID), static_cast<VkImage>(vtexture->ID), static_cast<VkDeviceMemory>(vtexture->placed_data().heap->ID), 0);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
         else if (type == ResourceType::Placed)
         {
-            vtexture->heap = heap;
+            vtexture->placed_data().heap = heap;
             res = vkBindImageMemory(static_cast<VkDevice>(ID), static_cast<VkImage>(vtexture->ID), static_cast<VkDeviceMemory>(heap->ID), offset);
             if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         }
