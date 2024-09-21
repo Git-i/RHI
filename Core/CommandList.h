@@ -52,7 +52,8 @@ namespace RHI
 		void BindIndexBuffer(Weak<Buffer> buffer, uint32_t offset);
 		void SetRootSignature(Weak<RootSignature> rs);
 		void EndRendering();
-		void PushConstant(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
+		void PushConstants(uint32_t bindingIndex, uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps);
+		void PushConstant(uint32_t bindingIndex, uint32_t constant, uint32_t offsetIn32BitSteps);
 		//todo (properly)
 		void BlitTexture(Weak<Texture> src, Weak<Texture> dst, Extent3D srcSize, Offset3D srcOffset, Extent3D dstSize, Offset3D dstOffset, SubResourceRange srcRange, SubResourceRange dstRange);
 		void MarkBuffer(Weak<Buffer> buffer, uint32_t offset, uint32_t val);

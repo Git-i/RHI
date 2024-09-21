@@ -9,7 +9,13 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Texture);
 	public:
-		ezr::result<void*, MappingError> Map();
+		/**
+		 * Multiple calls to @c Map can be made on the same resource, but only one resource per heap must be mapped when
+		 * using placed resources. To write to multiple placed resources in the same heap you should map a region of the heap
+		* via @c Heap::Map then calling @c MapFromHeapPtr
+		*/
+		ezr::result<void*, MappingError> Map(Aspect, uint32_t mip, uint32_t layer);
+		void* MapFromHeapPtr(void* heap_ptr, uint32_t offset, Aspect, uint32_t mip, uint32_t layer);
 		void UnMap();
 	};
 

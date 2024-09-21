@@ -135,10 +135,15 @@ namespace RHI
         info.layerCount = 1;
         vkCmdBeginRenderingKHR((VkCommandBuffer)ID, &info);
     }
-    void GraphicsCommandList::PushConstant(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
+    void GraphicsCommandList::PushConstants(uint32_t bindingIndex,uint32_t numConstants,const void* constants, uint32_t offsetIn32BitSteps)
     {
-        Weak<vRootSignature> rs = ((vGraphicsCommandList*)this)->currentRS;
+        Weak<vRootSignature> rs = reinterpret_cast<vGraphicsCommandList*>(this)->currentRS;
         vkCmdPushConstants((VkCommandBuffer)ID,(VkPipelineLayout)rs->ID,rs->pcBindingToStage[bindingIndex], offsetIn32BitSteps * sizeof(uint32_t), numConstants * sizeof(uint32_t), constants);
+    }
+    void GraphicsCommandList::PushConstant(uint32_t bindingIndex, uint32_t constant, uint32_t offsetIn32BitSteps)
+    {
+        Weak<vRootSignature> rs = reinterpret_cast<vGraphicsCommandList*>(this)->currentRS;
+        vkCmdPushConstants(static_cast<VkCommandBuffer>(ID), static_cast<VkPipelineLayout>(rs->ID), rs->pcBindingToStage[bindingIndex], offsetIn32BitSteps * sizeof(uint32_t), sizeof(uint32_t), &constant);
     }
     void GraphicsCommandList::EndRendering()
     {

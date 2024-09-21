@@ -73,10 +73,18 @@ namespace RHI
     class vResource
     {
     public:
-        std::uint64_t offset;
-        std::uint64_t size;
-        Ptr<Heap> heap;
-        VmaAllocation vma_ID = nullptr;//for automatic resources
+        union
+        {
+            struct
+            {
+                std::uint64_t offset;
+                std::uint64_t size;
+                Ptr<Heap> heap;
+            };
+            VmaAllocation vma_ID = nullptr;//for automatic resources
+        };
+        uint8_t* mapped_data = nullptr;
+        std::atomic<uint32_t> map_ref = 0;
     };
     class vBuffer final : public Buffer, public vResource
     {
@@ -84,7 +92,7 @@ namespace RHI
         ~vBuffer() override
         {
             if(vma_ID) vmaDestroyBuffer(device.retrieve_as_forced<vDevice>()->allocator, static_cast<VkBuffer>(ID), vma_ID);
-            else vkDestroyBuffer( static_cast<VkDevice>((device.retrieve_as_forced<vDevice>())->ID), static_cast<VkBuffer>(ID), nullptr);
+            else vkDestroyBuffer( static_cast<VkDevice>(device->ID), static_cast<VkBuffer>(ID), nullptr);
             vma_ID = nullptr; ID = nullptr;
         }
         int32_t GetType() override
