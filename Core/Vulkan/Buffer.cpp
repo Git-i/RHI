@@ -4,25 +4,36 @@
 #include "volk.h"
 namespace RHI
 {
-	RESULT Buffer::Map(void** data)
+	ezr::result<void*, MappingError> Buffer::Map()
 	{
 		auto vbuffer = reinterpret_cast<vBuffer*>(this);
-		if (vbuffer->is_auto())
+		if(vbuffer->mapped_data){}
+		else if (vbuffer->is_auto())
 		{
-			return vmaMapMemory((device.retrieve_as_forced<vDevice>())->allocator, vbuffer->vma_allocation(), data);
+			if(const auto res = vmaMapMemory((device.retrieve_as_forced<vDevice>())->allocator,
+				vbuffer->vma_allocation(), reinterpret_cast<void**>(&vbuffer->mapped_data)); res < VK_SUCCESS)
+				return ezr::err(MappingError::Unknown);
 		}
-		return vkMapMemory(static_cast<VkDevice>(device->ID), static_cast<VkDeviceMemory>(vbuffer->placed_data().heap->ID), vbuffer->placed_data().offset, vbuffer->placed_data().size, 0, data);
+		else
+		{
+			if(const auto res = vkMapMemory(static_cast<VkDevice>(device->ID), static_cast<VkDeviceMemory>(vbuffer->placed_data().heap->ID),
+				vbuffer->placed_data().offset, vbuffer->placed_data().size, 0, reinterpret_cast<void**>(&vbuffer->mapped_data)); res < VK_SUCCESS)
+				return ezr::err(MappingError::Unknown);
+		}
+		++vbuffer->map_ref;
+		return vbuffer->mapped_data;
 	}
-	RESULT Buffer::UnMap()
+	void Buffer::UnMap()
 	{
 		auto vbuffer = reinterpret_cast<vBuffer*>(this);
-		if (vbuffer->is_auto())
-		{
-			vmaUnmapMemory((device.retrieve_as_forced<vDevice>())->allocator, vbuffer->vma_allocation());
-			return 0;
-		}
-		vkUnmapMemory(static_cast<VkDevice>(device->ID), static_cast<VkDeviceMemory>(vbuffer->placed_data().heap->ID));
-		return 0;
+		if(!vbuffer->mapped_data) return;
+		--vbuffer->map_ref;
+		if(vbuffer->map_ref > 0) return;
+
+		if (vbuffer->is_auto()) vmaUnmapMemory((device.retrieve_as_forced<vDevice>())->allocator, vbuffer->vma_allocation());
+		else vkUnmapMemory(static_cast<VkDevice>(device->ID), static_cast<VkDeviceMemory>(vbuffer->placed_data().heap->ID));
+
+		vbuffer->mapped_data = nullptr;
 	}
 }
 

@@ -43,7 +43,8 @@ namespace RHI
 		void SetScissorRects(uint32_t numRects, Area2D* rects);
 		void SetViewports(uint32_t numViewports, Viewport* viewports);
 		void CopyBufferRegion(uint32_t srcOffset, uint32_t dstOffset, uint32_t size, Weak<Buffer> srcBuffer, Weak<Buffer> dstBuffer);
-		void CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture);
+		void CopyBufferToImage(uint32_t srcOffset, SubResourceLayers dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture);
+		void CopyImageToBuffer(Weak<Texture> texture, ResourceLayout texture_layout, Weak<Buffer> dst, uint32_t dstOffset, SubResourceLayers layers, Offset3D imgOffset, Extent3D imgSize);
 		void Draw(uint32_t numVertices, uint32_t numInstances, uint32_t firstVertex, uint32_t firstInstance);
 		void DrawIndexed(uint32_t IndexCount, uint32_t InstanceCount, uint32_t startIndexLocation, uint32_t startVertexLocation, uint32_t startInstanceLocation);
 		void Dispatch(uint32_t threadGroupCountX, uint32_t threadGroupCountY, uint32_t threadGroupCountZ);

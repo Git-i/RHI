@@ -8,8 +8,8 @@ namespace RHI
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Buffer);
 	public:
-		RESULT Map(void** data);
-		RESULT UnMap();
+		ezr::result<void*, MappingError> Map();
+		void UnMap();
 	};
 	struct RHI_API BufferDesc
 	{

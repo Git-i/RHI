@@ -269,11 +269,19 @@ namespace RHI
 		PLANE_2_BIT = 0x00000040,
 		NONE = 0,
 	};
+	enum class MappingError{ Unknown };
 	struct SubResourceRange
 	{
 		Aspect imageAspect;
 		std::uint32_t IndexOrFirstMipLevel;
 		std::uint32_t NumMipLevels;
+		std::uint32_t FirstArraySlice;
+		std::uint32_t NumArraySlices;
+	};
+	struct SubResourceLayers
+	{
+		Aspect imageAspect;
+		std::uint32_t IndexOrFirstMipLevel;
 		std::uint32_t FirstArraySlice;
 		std::uint32_t NumArraySlices;
 	};

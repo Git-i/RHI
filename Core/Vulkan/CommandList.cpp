@@ -262,7 +262,7 @@ namespace RHI
         copy.dstOffset = dstOffset;
         vkCmdCopyBuffer((VkCommandBuffer)ID, (VkBuffer)srcBuffer->ID, (VkBuffer)dstBuffer->ID, 1, &copy);
     }
-    void GraphicsCommandList::CopyBufferToImage(uint32_t srcOffset, SubResourceRange dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture)
+    void GraphicsCommandList::CopyBufferToImage(uint32_t srcOffset, SubResourceLayers dstRange, Offset3D imgOffset, Extent3D imgSize, Weak<Buffer> buffer, Weak<Texture> texture)
     {
         VkBufferImageCopy copy{};
         copy.bufferImageHeight = 0;
@@ -275,6 +275,20 @@ namespace RHI
         copy.imageSubresource.layerCount = dstRange.NumArraySlices;
         copy.imageSubresource.mipLevel = dstRange.IndexOrFirstMipLevel;
         vkCmdCopyBufferToImage((VkCommandBuffer)ID, (VkBuffer)buffer->ID, (VkImage)texture->ID, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    }
+
+    void GraphicsCommandList::CopyImageToBuffer(Weak<Texture> texture, ResourceLayout texture_layout, Weak<Buffer> dst, uint32_t dstOffset, SubResourceLayers layers, Offset3D
+                                                imgOffset, Extent3D imgSize)
+    {
+        VkBufferImageCopy copy{
+            .bufferOffset = dstOffset,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = {.aspectMask = static_cast<VkImageAspectFlags>(layers.imageAspect), .mipLevel = layers.IndexOrFirstMipLevel, .baseArrayLayer = layers.FirstArraySlice, .layerCount = layers.NumArraySlices},
+            .imageOffset = { imgOffset.width, imgOffset.height, imgOffset.depth },
+            .imageExtent = { imgSize.width, imgSize.height, imgSize.depth }
+        };
+        vkCmdCopyImageToBuffer(static_cast<VkCommandBuffer>(ID), static_cast<VkImage>(texture->ID), static_cast<VkImageLayout>(texture_layout), static_cast<VkBuffer>(dst->ID), 1, &copy);
     }
 
     void GraphicsCommandList::CopyTextureRegion(SubResourceRange srcRange, SubResourceRange dstRange, Offset3D srcOffset, Offset3D dstOffset, Extent3D extent, Weak<Texture> src, Weak<Texture> dst)

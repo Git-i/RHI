@@ -3,7 +3,7 @@
 #include "FormatsAndTypes.h"
 namespace RHI
 {
-	enum class MappingError{ Unknown };
+
 	class RHI_API  Texture : public Object
 	{
 	protected:
