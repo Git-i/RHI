@@ -1,6 +1,6 @@
 {
     "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
-    "C_Cpp.default.compileCommands": "/home/eric/Dev/RHI/builddir/compile_commands.json",
+    "C_Cpp.default.compileCommands": "/home/eric/Dev/Pistachio/subprojects/Pistachio-Engine/subprojects/RHI/builddir/compile_commands.json",
     "files.associations": {
         "array": "cpp",
         "atomic": "cpp",

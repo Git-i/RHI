@@ -1,7 +1,17 @@
 project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
+pymodule = import('python')
+python3 = pymodule.find_installation('python3')
+
+res = run_command(python3, '-c', 'import os; print(os.environ["VULKAN_SDK"])')
+vulkan_sdk = ''
+has_vulkan_sdk = res.returncode() == 0
+if has_vulkan_sdk
+    vulkan_sdk = res.stdout().strip()
+endif
 
 glfw3_dep= dependency('glfw3')
-
+cpp = meson.get_compiler('cpp')
+args = []
 inc_list = [
     '.','Core/'
     ]
@@ -24,7 +34,6 @@ vulkan_src = [
     'Core/Vulkan/DebugBuffer.cpp',
     'Core/Vulkan/Fence.cpp',
     'Core/Vulkan/Instance.cpp',
-    'Core/Vulkan/volk.c',
     'Core/Common.cpp',
     'Util/Vulkan/FormatUtils.cpp',
     'vendor/spirv_reflect/spirv_reflect.cpp'
@@ -39,7 +48,13 @@ if(get_option('API') == 'Vulkan')
     deps += dependency('vulkan')
     inc_list += ['vendor/spirv_reflect',
     'vendor/VulkanAfterCrash/include',
-    'vendor/VulkanMemoryAllocator/include']
+    ]
+    assert(has_vulkan_sdk, 'Vulkan SDK must be present to use vulkan')
+    inc_list += [
+        vulkan_sdk / 'include',
+        vulkan_sdk / 'include' / 'vma'
+    ]
+    vulkan_src += vulkan_sdk / 'include' / 'volk.c'
 endif
 
 inc = include_directories(inc_list)
@@ -59,7 +74,10 @@ endif
 if(build_machine.system() == 'windows')
     add_project_arguments('-DVK_USE_PLATFORM_WIN32_KHR',language: 'cpp')
 endif
-lib = library('RHI', vulkan_src, include_directories: inc, dependencies: deps, 
-override_options : ['cpp_std=c++20'])
+lib = library('RHI', vulkan_src, 
+    include_directories: inc, 
+    dependencies: deps, 
+    cpp_args: args,
+    override_options : ['cpp_std=c++20'])
 rhi_dep = declare_dependency(include_directories: inc, link_with: lib, dependencies: deps)
 meson.override_dependency('pistachio_rhi', rhi_dep)
