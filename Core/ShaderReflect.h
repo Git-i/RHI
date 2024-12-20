@@ -36,7 +36,7 @@ namespace RHI
 		DynamicDescriptorConflict,
 		DescriptorRangeConflict
 	};
-	class RHI_API ShaderReflection : public Object
+	class RHI_API ShaderReflection : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(ShaderReflection)

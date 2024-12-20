@@ -53,7 +53,7 @@ namespace RHI
 		StorageImage = 1 << 8,
 	};
 	DEFINE_ENUM_FLAG_OPERATORS(FormatSupport);
-	class RHI_API PhysicalDevice
+	class RHI_API PhysicalDevice : public Object
 	{
 	public:
 		static RHI::PhysicalDevice* FromNativeHandle(Internal_ID id);
@@ -61,7 +61,6 @@ namespace RHI
 		PhysicalDeviceDesc GetDesc();
 		FormatSupport GetFormatSupportInfo(RHI::Format format, TextureTilingMode t);
 		FormatSupport GetBufferFormatSupportInfo(RHI::Format format);
-		Internal_ID ID;
 	};
 
 }

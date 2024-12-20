@@ -16,7 +16,7 @@ namespace RHI
 		SubOptimal,
 		Unknown
 	};
-	class RHI_API SwapChain : public Object
+	class RHI_API SwapChain : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(SwapChain);

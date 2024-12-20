@@ -5,7 +5,7 @@
 #include "FormatsAndTypes.h"
 namespace RHI
 {
-	class RHI_API RootSignature : public Object
+	class RHI_API RootSignature : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(RootSignature);

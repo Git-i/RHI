@@ -11,7 +11,7 @@ namespace RHI
             vInstance::current->logCallback(lvl, msg);
         }
     }
-    VkFormat FormatConv(const RHI::Format format)
+    VkFormat FormatConv(const Format format)
     {
         return static_cast<VkFormat>(FormatToVk(format));
     }
@@ -31,21 +31,21 @@ namespace RHI
     {
         switch (topology)
         {
-        case RHI::PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        case RHI::PrimitiveTopology::LineList: return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-        case RHI::PrimitiveTopology::LineStrip: return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-        case RHI::PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        case RHI::PrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+        case PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        case PrimitiveTopology::LineList: return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+        case PrimitiveTopology::LineStrip: return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+        case PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        case PrimitiveTopology::TriangleStrip: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
         default: return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         }
     }
-    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(RHI::PhysicalDevice* device, RHI::Surface surface)
+    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(PhysicalDevice* device, Surface surface)
     {
         QueueFamilyIndices indices = {};
         uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)device->ID, &queueFamilyCount, nullptr);
+        vkGetPhysicalDeviceQueueFamilyProperties(static_cast<VkPhysicalDevice>(device->ID), &queueFamilyCount, nullptr);
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties((VkPhysicalDevice)device->ID, &queueFamilyCount, queueFamilies.data());
+        vkGetPhysicalDeviceQueueFamilyProperties(static_cast<VkPhysicalDevice>(device->ID), &queueFamilyCount, queueFamilies.data());
         std::vector<uint32_t> count(queueFamilyCount);
         for (uint32_t i = 0; i < queueFamilyCount; i++)
         {

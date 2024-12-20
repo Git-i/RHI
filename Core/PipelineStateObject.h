@@ -6,14 +6,14 @@
 #include "RootSignature.h"
 namespace RHI
 {
-	class RHI_API PipelineStateObject : public Object
+	class RHI_API PipelineStateObject : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(PipelineStateObject);
 		
 	};
 	//The Naming Conventions is a bit off, because Compute is kind of an afterthought (so is raytracing)
-	class RHI_API ComputePipeline : public Object
+	class RHI_API ComputePipeline : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(ComputePipeline);

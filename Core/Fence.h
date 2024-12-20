@@ -3,7 +3,7 @@
 
 namespace RHI
 {
-	class RHI_API Fence : public Object
+	class RHI_API Fence : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Fence);

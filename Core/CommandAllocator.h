@@ -4,7 +4,7 @@
 
 namespace RHI
 {
-	class RHI_API CommandAllocator : public Object
+	class RHI_API CommandAllocator : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(CommandAllocator);

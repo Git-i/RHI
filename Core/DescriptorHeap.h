@@ -5,7 +5,7 @@
 #include "TextureView.h"
 namespace RHI
 {
-	class RHI_API DescriptorHeap : public Object
+	class RHI_API DescriptorHeap : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(DescriptorHeap);
@@ -13,13 +13,13 @@ namespace RHI
 		CPU_HANDLE GetCpuHandle();
 	};
 
-	class RHI_API DescriptorSetLayout : public Object
+	class RHI_API DescriptorSetLayout : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(DescriptorSetLayout);
 	};
 
-	class RHI_API DescriptorSet : public Object
+	class RHI_API DescriptorSet : public DeviceChild
 	{
 	protected:
 	    DECL_CLASS_CONSTRUCTORS(DescriptorSet);
@@ -28,7 +28,7 @@ namespace RHI
 	    Ptr<DescriptorHeap> GetHeap();
 	};
 
-	class RHI_API DynamicDescriptor : public Object
+	class RHI_API DynamicDescriptor : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(DynamicDescriptor);

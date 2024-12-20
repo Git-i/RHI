@@ -4,7 +4,7 @@
 namespace RHI
 {
 
-	class RHI_API  Texture : public Object
+	class RHI_API  Texture : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Texture);

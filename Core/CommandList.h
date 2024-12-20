@@ -11,7 +11,7 @@
 namespace RHI
 {
 	struct RenderingBeginDesc;
-	class RHI_API CommandList : public Object
+	class RHI_API CommandList : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(CommandList);

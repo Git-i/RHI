@@ -6,7 +6,7 @@
 #include "Ptr.h"
 namespace RHI
 {
-	class RHI_API CommandQueue : public Object
+	class RHI_API CommandQueue : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(CommandQueue);

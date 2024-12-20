@@ -2,7 +2,7 @@
 #include "Object.h"
 namespace RHI
 {
-	class RHI_API Heap : public Object
+	class RHI_API Heap : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Heap);

@@ -17,7 +17,7 @@ namespace RHI
 		SubResourceRange range;
 		//TODO 4 component mapping
 	};
-	class TextureView : public Object
+	class TextureView : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(TextureView);

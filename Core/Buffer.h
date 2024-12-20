@@ -3,7 +3,7 @@
 #include "FormatsAndTypes.h"
 namespace RHI
 {
-	class RHI_API Buffer : public Object
+	class RHI_API Buffer : public DeviceChild
 	{
 	protected:
 		DECL_CLASS_CONSTRUCTORS(Buffer);

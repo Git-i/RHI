@@ -100,11 +100,11 @@ namespace RHI
             else return ezr::err(CreationError::CommandQueueNotAvailable);
             if (qcounts[index] <= usedQueues[index])
             {
-                RHI::log(LogLevel::Error, std::format("Attempted to Create Too Many Queues of type {0}", [&]{
+                log(LogLevel::Error, std::format("Attempted to Create Too Many Queues of type {0}", [&]{
                     if (qi.commandListType == RHI::CommandListType::Direct) return "Graphics";
-                    else if (qi.commandListType == RHI::CommandListType::Compute) return "Compute";
-                    else if (qi.commandListType == RHI::CommandListType::Copy) return "Copy";
-                    else return "Unkown";
+                    if (qi.commandListType == RHI::CommandListType::Compute) return "Compute";
+                    if (qi.commandListType == RHI::CommandListType::Copy) return "Copy";
+                    return "Unkown";
                 }()));
                 return ezr::err(CreationError::CommandQueueNotAvailable);
             }
