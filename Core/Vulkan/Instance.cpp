@@ -150,7 +150,7 @@ namespace RHI
 		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
 		return count;
 	}
-	std::pair<uint32_t, uint32_t> Instance::GetSwapChainMinMaxImageCount(Weak<PhysicalDevice> pDev, Surface* surface)
+	std::pair<uint32_t, uint32_t> Instance::GetSwapChainMinMaxImageCount(Weak<PhysicalDevice> pDev, Weak<Surface> surface)
 	{
 		VkSurfaceCapabilitiesKHR caps;
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(static_cast<VkPhysicalDevice>(pDev->ID),static_cast<VkSurfaceKHR>(surface->ID),&caps);
@@ -161,12 +161,12 @@ namespace RHI
 		Ptr<vSwapChain> vswapChain(new vSwapChain);
 		VkSwapchainCreateInfoKHR createInfo{};
 		std::uint32_t count;
-		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface.ID, &count, nullptr);
+		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface->ID, &count, nullptr);
 		std::vector<VkSurfaceFormatKHR> format(count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface.ID, &count, format.data());
+		vkGetPhysicalDeviceSurfaceFormatsKHR((VkPhysicalDevice)pDevice->ID, (VkSurfaceKHR)desc.OutputSurface->ID, &count, format.data());
 
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = (VkSurfaceKHR)desc.OutputSurface.ID;
+		createInfo.surface = (VkSurfaceKHR)desc.OutputSurface->ID;
 
 		createInfo.minImageCount = desc.BufferCount;
 		createInfo.imageFormat = FormatConv(desc.SwapChainFormat);

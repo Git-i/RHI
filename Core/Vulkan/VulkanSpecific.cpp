@@ -39,7 +39,7 @@ namespace RHI
         default: return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         }
     }
-    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(Weak<PhysicalDevice> device, Surface surface)
+    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(Weak<PhysicalDevice> device, Weak<Surface> surface)
     {
         QueueFamilyIndices indices = {};
         uint32_t queueFamilyCount = 0;
@@ -67,10 +67,10 @@ namespace RHI
                 count[i] = queueFamilies[i].queueCount;
                 indices.flags |= HasCopy;
             }
-            if (surface.ID)
+            if (surface.IsValid())
             {
                 VkBool32 presentSupport = false;
-                vkGetPhysicalDeviceSurfaceSupportKHR((VkPhysicalDevice)device->ID, i, (VkSurfaceKHR)surface.ID, &presentSupport);
+                vkGetPhysicalDeviceSurfaceSupportKHR((VkPhysicalDevice)device->ID, i, (VkSurfaceKHR)surface->ID, &presentSupport);
 
                 if (presentSupport && !(indices.flags & HasPresent)) {
                     indices.presentIndex = i;

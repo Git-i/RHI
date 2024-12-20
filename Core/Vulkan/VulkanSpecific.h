@@ -31,7 +31,7 @@ namespace RHI
 
 
     CreationError marshall_error(VkResult r);
-    std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(Weak<PhysicalDevice> device, RHI::Surface surface = RHI::Surface());
+    std::pair<QueueFamilyIndices, std::vector<uint32_t>> findQueueFamilyIndices(Weak<PhysicalDevice> device, Weak<Surface> surface = nullptr);
     class vInstance final : public Instance
     {
     public:
@@ -40,6 +40,7 @@ namespace RHI
         VkDebugUtilsMessengerEXT messenger;
         ~vInstance() override
         {
+            vkDestroyDebugUtilsMessengerEXT(static_cast<VkInstance>(ID), messenger, nullptr);
             vkDestroyInstance(static_cast<VkInstance>(ID), nullptr);
         }
         int32_t GetType() override
@@ -137,9 +138,22 @@ namespace RHI
             return VK_OBJECT_TYPE_IMAGE_VIEW;
         }
     };
+    class vSurface final : public Surface
+    {
+    public:
+        ~vSurface() override
+        {
+            vkDestroySurfaceKHR(static_cast<VkInstance>(instance->ID), static_cast<VkSurfaceKHR>(ID), nullptr);
+        }
+        Ptr<Instance> instance;
+    };
     class vDebugBuffer final : public DebugBuffer
     {
     public:
+        ~vDebugBuffer() override
+        {
+            VkAfterCrash_DestroyBuffer(static_cast<VkAfterCrash_Buffer>(ID));
+        }
         uint32_t* data;
 
     };
@@ -318,6 +332,7 @@ namespace RHI
             {
                 texture = nullptr;
             }
+            vkDestroyFence(static_cast<VkDevice>(device->ID), imageAcquired, nullptr);
             vkDestroySwapchainKHR(static_cast<VkDevice>(device->ID), static_cast<VkSwapchainKHR>(ID), nullptr);
         }
         int32_t GetType() override

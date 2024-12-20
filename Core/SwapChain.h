@@ -26,7 +26,7 @@ namespace RHI
 	};
 	struct RHI_API SwapChainDesc
 	{
-		Surface OutputSurface;
+		Weak<Surface> OutputSurface;
 		unsigned int Width;
 		unsigned int Height;
 		Rational RefreshRate;

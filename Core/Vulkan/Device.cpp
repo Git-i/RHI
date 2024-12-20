@@ -1442,6 +1442,7 @@ namespace RHI
         info.markerCount = 1;
         const VkResult res = VkAfterCrash_CreateBuffer(reinterpret_cast<vDevice*>(this)->acDevice, &info, reinterpret_cast<VkAfterCrash_Buffer*>(&buff->ID),&buff->data);
         if(res < 0) return creation_result<DebugBuffer>::err(marshall_error(res));
+        ADD_CHILD(buff);
         return creation_result<DebugBuffer>::ok(buff);
     }
 

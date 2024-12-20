@@ -1,12 +1,13 @@
 #pragma once
-#include "Core.h"
+#include "Object.h"
 #include "FormatsAndTypes.h"
 #ifdef USE_GLFW
 #include <GLFW/glfw3.h>
 #endif
 namespace RHI
 {
-	class RHI_API Surface
+	class Instance;
+	class RHI_API Surface : public Object
 	{
 	public:
 #ifdef _WIN32
@@ -22,7 +23,7 @@ namespace RHI
 #endif
 
 #ifdef USE_GLFW
-		RHI::CreationError InitGLFW(GLFWwindow* window, Internal_ID instance);
+		static creation_result<Surface> InitGLFW(GLFWwindow* window, Ptr<Instance> instance);
 #endif
 		Internal_ID ID = 0;
 	};

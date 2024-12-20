@@ -21,10 +21,15 @@ namespace RHI
 	//}
 	#endif
 	#ifdef USE_GLFW
-	RHI::CreationError RHI::Surface::InitGLFW(GLFWwindow* window, Internal_ID instance)
+
+	creation_result<Surface> Surface::InitGLFW(GLFWwindow* window, Ptr<Instance> instance)
 	{
-		VkResult res = glfwCreateWindowSurface((VkInstance)instance, window, nullptr, (VkSurfaceKHR*)&ID);
-		return marshall_error(res);
+		Ptr<Surface> srf(new vSurface);
+		VkResult res = glfwCreateWindowSurface(static_cast<VkInstance>(instance->ID), window, nullptr,
+			reinterpret_cast<VkSurfaceKHR*>(&srf->ID));
+		if (res != VK_SUCCESS) return ezr::err(marshall_error(res));
+		srf.retrieve_as_forced<vSurface>()->instance = instance;
+		return srf;
 	}
 	#endif
 }

@@ -20,7 +20,7 @@ namespace RHI
 		void SetLoggerCallback(const std::function<void(LogLevel, std::string_view)>&);
 		API GetInstanceAPI();
 		uint32_t GetNumPhysicalDevices();
-		std::pair<uint32_t, uint32_t> GetSwapChainMinMaxImageCount(Weak<PhysicalDevice> pDev, Surface* surface);
+		std::pair<uint32_t, uint32_t> GetSwapChainMinMaxImageCount(Weak<PhysicalDevice> pDev, Weak<Surface> surface);
 		std::vector<Ptr<PhysicalDevice>> GetAllPhysicalDevices();
 		Ptr<PhysicalDevice> GetPhysicalDevice(uint32_t id);
 		static creation_result<RHI::Instance> FromNativeHandle(Internal_ID id);
