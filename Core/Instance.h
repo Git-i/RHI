@@ -24,7 +24,7 @@ namespace RHI
 		std::vector<Ptr<PhysicalDevice>> GetAllPhysicalDevices();
 		Ptr<PhysicalDevice> GetPhysicalDevice(uint32_t id);
 		static creation_result<RHI::Instance> FromNativeHandle(Internal_ID id);
-		creation_result<SwapChain> CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* device, Ptr<Device> pDevice, Weak<CommandQueue> pCommandQueue);
+		creation_result<SwapChain> CreateSwapChain(const SwapChainDesc& desc, Weak<PhysicalDevice> pDevice, Ptr<Device> Device, Weak<CommandQueue> pCommandQueue);
 		static creation_result<Instance> Create();
 	};
 

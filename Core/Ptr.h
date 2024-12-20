@@ -167,10 +167,7 @@ namespace RHI
     {
     private:
         T* ptr;
-        Weak(T* val)
-        {
-            ptr = val;
-        }
+
     public:
         template<typename U> friend class Ptr;
         template<typename U> friend class Weak;
@@ -179,6 +176,10 @@ namespace RHI
             this->ptr = ptr.Get();
         }
         Weak() = default;
+        explicit Weak(T* val)
+        {
+            ptr = val;
+        }
         Weak(std::nullptr_t)
         {
             ptr = nullptr;

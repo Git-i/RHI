@@ -62,7 +62,7 @@ static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 namespace RHI
 {
     ezr::result<std::pair<Ptr<Device>, std::vector<Ptr<CommandQueue>>>, CreationError>
-    Device::Create(PhysicalDevice* PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, const Ptr<Instance>& inst, DeviceCreateFlags flags)
+    Device::Create(Weak<PhysicalDevice> PhysicalDevice,std::span<CommandQueueDesc> commandQueueInfos, const Ptr<Instance>& inst, DeviceCreateFlags flags)
     {
         const auto instance = static_cast<VkInstance>(inst->ID);
         uint32_t numCommandQueues = commandQueueInfos.size();

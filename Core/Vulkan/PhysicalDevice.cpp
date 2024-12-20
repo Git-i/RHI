@@ -6,10 +6,11 @@
 #include <vulkan/vulkan_core.h>
 namespace RHI
 {
-	RHI::PhysicalDevice* PhysicalDevice::FromNativeHandle(Internal_ID id)
+	Ptr<PhysicalDevice> PhysicalDevice::FromNativeHandle(Internal_ID id)
 	{
-		vPhysicalDevice* dev = new vPhysicalDevice;
+		Ptr<PhysicalDevice> dev(new vPhysicalDevice);
 		dev->ID = id;
+		dev->Hold();
 		return dev;
 	}
 	DeviceType ToRHIType(VkPhysicalDeviceType t)
@@ -70,7 +71,7 @@ namespace RHI
     }
 	QueueInfo PhysicalDevice::GetQueueInfo()
 	{
-		auto[family, count] = findQueueFamilyIndices(this);
+		auto[family, count] = findQueueFamilyIndices(Weak(this));
 		std::unordered_map<uint32_t, uint32_t> family_to_count_index;
 		QueueInfo info;
 		uint32_t next_count_index = 0;

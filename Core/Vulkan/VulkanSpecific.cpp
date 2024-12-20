@@ -39,7 +39,7 @@ namespace RHI
         default: return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         }
     }
-    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(PhysicalDevice* device, Surface surface)
+    std::pair<QueueFamilyIndices,std::vector<uint32_t>> findQueueFamilyIndices(Weak<PhysicalDevice> device, Surface surface)
     {
         QueueFamilyIndices indices = {};
         uint32_t queueFamilyCount = 0;

@@ -132,7 +132,7 @@ namespace RHI
 		std::vector<VkPhysicalDevice> vk_devices(count);
 		VkResult res = vkEnumeratePhysicalDevices(static_cast<VkInstance>(ID), &count, vk_devices.data());
 		std::vector<Ptr<PhysicalDevice>> devices;
-		devices.resize(count);
+		devices.reserve(count);
 		for(auto dev : vk_devices)
 		{
 			devices.emplace_back(new vPhysicalDevice);
@@ -156,7 +156,7 @@ namespace RHI
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(static_cast<VkPhysicalDevice>(pDev->ID),static_cast<VkSurfaceKHR>(surface->ID),&caps);
 		return {caps.minImageCount, caps.maxImageCount};
 	}
-	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* pDevice, Ptr<Device> Device, Weak<CommandQueue> pCommandQueue)
+	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, Weak<PhysicalDevice> pDevice, Ptr<Device> Device, Weak<CommandQueue> pCommandQueue)
 	{
 		Ptr<vSwapChain> vswapChain(new vSwapChain);
 		VkSwapchainCreateInfoKHR createInfo{};
