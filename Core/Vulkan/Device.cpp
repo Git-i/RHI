@@ -40,6 +40,7 @@
   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
 #endif
 using namespace ezr;
+#define ADD_CHILD(child) child->device = make_ptr(this); reinterpret_cast<vDevice*>(this)->objects.emplace(child.Raw())
 static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 {
     std::uint32_t DefaultHeap = UINT32_MAX;
@@ -402,7 +403,7 @@ namespace RHI
         info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; //to align with d3d's model
         VkResult res = vkCreateCommandPool(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkCommandPool*>(&vallocator->ID));
-        vallocator->device = make_ptr(this);
+        ADD_CHILD(vallocator);
 
 
         if(res < 0) return creation_result<CommandAllocator>::err(marshall_error(res));
@@ -419,7 +420,7 @@ namespace RHI
         VkCommandBuffer commandBuffer;
         const VkResult res = vkAllocateCommandBuffers(static_cast<VkDevice>(ID), &Info, &commandBuffer);
         vCommandlist->ID = commandBuffer;
-        vCommandlist->device = make_ptr(this);
+        ADD_CHILD(vCommandlist);
         vCommandlist->allocator = allocator.transform<vCommandAllocator>();
 
         if(res < 0)
@@ -485,7 +486,7 @@ namespace RHI
 
             res = vkCreateDescriptorPool(static_cast<VkDevice>(ID), &poolInfo, nullptr, reinterpret_cast<VkDescriptorPool*>(&vdescriptorHeap->ID));
         }
-        vdescriptorHeap->device = make_ptr(this);
+        ADD_CHILD(vdescriptorHeap);
         if(res < 0) return creation_result<DescriptorHeap>::err(marshall_error(res));
         return creation_result<DescriptorHeap>::ok(vdescriptorHeap);
     }
@@ -544,7 +545,7 @@ namespace RHI
         VkResult res = vkGetSwapchainImagesKHR(static_cast<VkDevice>(ID), static_cast<VkSwapchainKHR>(swapchain->ID), &img, images.data());
         vtexture->ID = images[index];
         vtexture->Hold();//the image is externally owned
-        vtexture->device = make_ptr(this);
+        ADD_CHILD(vtexture);
         if(res < 0) return creation_result<Texture>::err(marshall_error(res));
         return ezr::ok(vtexture.transform<Texture>());
     }
@@ -565,7 +566,7 @@ namespace RHI
         VkSemaphore timelineSemaphore;
         const VkResult res = vkCreateSemaphore(static_cast<VkDevice>(ID), &createInfo, nullptr, &timelineSemaphore);
         vfence->ID = timelineSemaphore;
-        vfence->device = make_ptr(this);
+        ADD_CHILD(vfence);
 
         if(res < 0) return creation_result<Fence>::err(marshall_error(res));
         return creation_result<Fence>::ok(vfence);
@@ -578,7 +579,7 @@ namespace RHI
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         info.size = desc.size;
         info.usage = VkBufferUsage(desc.usage);
-        vbuffer->device = make_ptr(this);
+        ADD_CHILD(vbuffer);
         if (type == ResourceType::Automatic)
         {
             vbuffer->allocation = nullptr;
@@ -816,7 +817,7 @@ namespace RHI
         {
             return creation_result<RootSignature>::err(marshall_error(res));
         }
-        vrootSignature->device = make_ptr(this);
+        ADD_CHILD(vrootSignature);
         uint32_t layout_idx = 0;
         for (uint32_t i : std::views::iota(0u, numLayouts))
         {
@@ -828,7 +829,7 @@ namespace RHI
 
             pSetLayouts[layout_idx] = Ptr(new vDescriptorSetLayout);
             pSetLayouts[layout_idx]->ID = std::get<0>(descriptorSetLayout[i]);
-            pSetLayouts[layout_idx]->device = make_ptr(this);
+            ADD_CHILD(pSetLayouts[layout_idx]);
             layout_idx++;
         }
         return creation_result<RootSignature>::ok(vrootSignature);
@@ -1060,7 +1061,7 @@ namespace RHI
         pipelineInfo.basePipelineIndex = -1; // Optional
 
 
-        vPSO->device = make_ptr(this);
+        ADD_CHILD(vPSO);
 
         if(const VkResult res = vkCreateGraphicsPipelines(static_cast<VkDevice>(ID), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, reinterpret_cast<VkPipeline*>(&vPSO->ID));
             res < 0) return creation_result<PipelineStateObject>::err(marshall_error(res));
@@ -1089,7 +1090,7 @@ namespace RHI
         {
             auto& ptr = returnValues.emplace_back(new vDescriptorSet);
             ptr.retrieve_as_forced<vDescriptorSet>()->ID = descriptorSets[i];
-            ptr.retrieve_as_forced<vDescriptorSet>()->device = make_ptr(this);
+            ADD_CHILD(ptr);
             ptr.retrieve_as_forced<vDescriptorSet>()->heap = heap.transform<vDescriptorHeap>();
             ptr.retrieve_as_forced<vDescriptorSet>()->layout = layouts[i].transform<vDescriptorSetLayout>();
         }
@@ -1242,7 +1243,7 @@ namespace RHI
 
         if(res < 0) return creation_result<DynamicDescriptor>::err(marshall_error(res));
 
-        vdescriptor->device = make_ptr(this);
+        ADD_CHILD(vdescriptor);
         vdescriptor->heap = heap.transform<vDescriptorHeap>();
         VkDescriptorBufferInfo binfo{};
         binfo.buffer = static_cast<VkBuffer>(buffer->ID);
@@ -1276,7 +1277,7 @@ namespace RHI
         info.tiling = ImageTiling(desc.mode);
         info.usage = ImageUsage(desc.usage);
         info.samples = VK_SAMPLE_COUNT_1_BIT;
-        vtexture->device = make_ptr(this);
+        ADD_CHILD(vtexture);
         if (type == ResourceType::Automatic)
         {
             vtexture->allocation = nullptr;
@@ -1375,7 +1376,7 @@ namespace RHI
         info.subresourceRange = range;
         info.viewType = VkViewType(desc.type);
         Ptr<vTextureView> vtview(new vTextureView);
-        vtview->device = make_ptr(this);
+        ADD_CHILD(vtview);
         if(const VkResult res = vkCreateImageView(static_cast<VkDevice>(ID), &info, nullptr, reinterpret_cast<VkImageView*>(&vtview->ID)); res < 0)
             return creation_result<TextureView>::err(marshall_error(res));
         return creation_result<TextureView>::ok(vtview);
@@ -1427,7 +1428,7 @@ namespace RHI
     creation_result<ComputePipeline> Device::CreateComputePipeline(const ComputePipelineDesc& desc)
     {
         Ptr<vComputePipeline> vpipeline(new vComputePipeline);
-        vpipeline->device = make_ptr(this);
+        ADD_CHILD(vpipeline);
         VkComputePipelineCreateInfo info{};
         info.layout = static_cast<VkPipelineLayout>(desc.rootSig->ID);
         VkShaderModule module;

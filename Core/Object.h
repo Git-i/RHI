@@ -28,5 +28,7 @@ namespace RHI
 		friend class Device;
 		friend class Instance;
 		Ptr<Object> device = nullptr;
+	public:
+		virtual ~DeviceChild();
 	};
 }

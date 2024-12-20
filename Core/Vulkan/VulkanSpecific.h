@@ -21,7 +21,9 @@
 #include "../DebugBuffer.h"
 #include "VulkanAfterCrash.h"
 #include <algorithm>//for std::find
+#include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vulkan/vulkan_core.h>
 namespace RHI
@@ -67,6 +69,8 @@ namespace RHI
         std::uint32_t UploadHeapIndex = UINT32_MAX;
         std::uint32_t ReadBackHeapIndex = UINT32_MAX;
         QueueFamilyIndices indices;
+        //to keep track of all refs to it, should be removed at release
+        std::unordered_set<DeviceChild*> objects;
     };
 
     VkFormat FormatConv(RHI::Format format);

@@ -25,6 +25,13 @@ namespace RHI {
 	{
 		return refCnt;
 	}
+
+	DeviceChild::~DeviceChild()
+	{
+		if(device.IsValid())
+			device.retrieve_as_forced<vDevice>()->objects.erase(this);
+	}
+
 	void Object::SetName(const char* obj_name)
 	{
 		VkDebugUtilsObjectNameInfoEXT name_info{};
