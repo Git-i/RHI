@@ -42,7 +42,9 @@ vulkan_src = [
 ezr = subproject('ezr')
 ezr_dep = ezr.get_variable('ezr_dep')
 
-deps = [ezr_dep]
+cpptrace = dependency('cpptrace')
+dwarf = cpp.find_library('dwarf')
+deps = [ezr_dep, cpptrace, dwarf]
 if(get_option('API') == 'Vulkan')
 
     deps += dependency('vulkan')

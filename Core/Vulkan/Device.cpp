@@ -34,13 +34,14 @@
 #include "vk_mem_alloc.h"
 #include <iostream>
 #include <fstream>
+#include "cpptrace/cpptrace.hpp"
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(a) \
   ((sizeof(a) / sizeof(*(a))) / \
   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
 #endif
 using namespace ezr;
-#define ADD_CHILD(child) child->device = make_ptr(this); reinterpret_cast<vDevice*>(this)->objects.emplace(child.Raw())
+#define ADD_CHILD(child) child->device = make_ptr(this); reinterpret_cast<vDevice*>(this)->objects.emplace(child.Raw(), cpptrace::generate_trace().to_string());
 static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 {
     std::uint32_t DefaultHeap = UINT32_MAX;
@@ -537,17 +538,10 @@ namespace RHI
             return sizeof(VkSampler);
         return 0;
     }
-    creation_result<Texture> Device::GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index)
+    std::optional<Weak<Texture>> Device::GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index)
     {
-        Ptr<vTexture> vtexture(new vTexture);
-        std::uint32_t img = index + 1;
-        std::vector<VkImage> images(img);
-        VkResult res = vkGetSwapchainImagesKHR(static_cast<VkDevice>(ID), static_cast<VkSwapchainKHR>(swapchain->ID), &img, images.data());
-        vtexture->ID = images[index];
-        vtexture->Hold();//the image is externally owned
-        ADD_CHILD(vtexture);
-        if(res < 0) return creation_result<Texture>::err(marshall_error(res));
-        return ezr::ok(vtexture.transform<Texture>());
+        if(index >= swapchain.ForceTransform<vSwapChain>()->textures.size()) return std::nullopt;
+        return swapchain.ForceTransform<vSwapChain>()->textures[index];
     }
     creation_result<Fence> Device::CreateFence( std::uint64_t val)
     {

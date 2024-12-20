@@ -61,7 +61,7 @@ namespace RHI
 		creation_result<Fence> CreateFence(std::uint64_t val);
 		creation_result<DebugBuffer> CreateDebugBuffer();
 		std::uint32_t GetDescriptorHeapIncrementSize(DescriptorType type);
-		creation_result<Texture> GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index);
+		std::optional<Weak<Texture>> GetSwapChainImage(Weak<SwapChain> swapchain, std::uint32_t index);
 		uint32_t GetConstantBufferAlignment();
 		RESULT GetMemorySharingCapabilites();
 		void DestroySampler(CPU_HANDLE handle) const;

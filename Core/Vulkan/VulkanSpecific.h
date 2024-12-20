@@ -70,7 +70,7 @@ namespace RHI
         std::uint32_t ReadBackHeapIndex = UINT32_MAX;
         QueueFamilyIndices indices;
         //to keep track of all refs to it, should be removed at release
-        std::unordered_set<DeviceChild*> objects;
+        std::unordered_map<DeviceChild*, std::string> objects;
     };
 
     VkFormat FormatConv(RHI::Format format);
@@ -314,6 +314,11 @@ namespace RHI
     public:
         ~vSwapChain() override
         {
+            for(auto& texture : textures)
+            {
+                delete texture.Raw();
+                texture = nullptr;
+            }
             vkDestroySwapchainKHR(static_cast<VkDevice>(device->ID), static_cast<VkSwapchainKHR>(ID), nullptr);
         }
         int32_t GetType() override
@@ -321,6 +326,7 @@ namespace RHI
             return VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         }
     public:
+        std::vector<Ptr<Texture>> textures;
         uint32_t imgIndex;
         VkFence imageAcquired;
         VkQueue PresentQueue_ID;

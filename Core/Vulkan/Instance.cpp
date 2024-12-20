@@ -195,6 +195,21 @@ namespace RHI
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 		VkResult res = vkCreateSwapchainKHR((VkDevice)Device->ID, &createInfo, nullptr, (VkSwapchainKHR*)&vswapChain->ID);
 		if(res < 0) return ezr::err(marshall_error(res));
+
+		uint32_t image_count = 0;
+		vkGetSwapchainImagesKHR(
+			static_cast<VkDevice>(Device->ID), static_cast<VkSwapchainKHR>(vswapChain->ID), &image_count, nullptr);
+		std::vector<VkImage> images(image_count);
+		vkGetSwapchainImagesKHR(static_cast<VkDevice>(Device->ID), static_cast<VkSwapchainKHR>(vswapChain->ID), &image_count, images.data());
+		for(auto image : images)
+		{
+			struct SwapTexture : public Texture {};
+			vswapChain->textures.emplace_back(new SwapTexture);
+			vswapChain->textures.back()->ID = image;
+			vswapChain->textures.back()->device = Device;
+			Device.retrieve_as_forced<vDevice>()->objects.emplace(vswapChain->textures.back().Raw(), "");
+			vswapChain->Hold();
+		}
 		VkFenceCreateInfo finfo{};
 		finfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		finfo.flags = 0;
