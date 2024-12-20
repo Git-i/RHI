@@ -109,36 +109,36 @@ namespace RHI
 		volkLoadInstance((VkInstance)inst->ID);
 		return creation_result<Instance>::ok(inst);
 	}
-	RESULT Instance::GetPhysicalDevice(uint32_t id, PhysicalDevice** device)
+	Ptr<PhysicalDevice> Instance::GetPhysicalDevice(uint32_t id)
 	{
-		vPhysicalDevice* vdevice = new vPhysicalDevice;
+		Ptr<PhysicalDevice> vdevice(new vPhysicalDevice);
 		std::vector<VkPhysicalDevice> devices;
 		std::uint32_t count;
-		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
+		vkEnumeratePhysicalDevices(static_cast<VkInstance>(ID), &count, nullptr);
+		if(id > count - 1) return nullptr;
 		devices.resize(count);
-		VkResult res = vkEnumeratePhysicalDevices((VkInstance)ID, &count, &devices[0]);
+		VkResult res = vkEnumeratePhysicalDevices(static_cast<VkInstance>(ID), &count, &devices[0]);
 		vdevice->ID = devices[id];
-		*device = vdevice;
-		return res;
+		return vdevice;
 	}
 	void Instance::SetLoggerCallback(const std::function<void(LogLevel, std::string_view)>& fn)
 	{	
-		((vInstance*)this)->logCallback = fn;
+		reinterpret_cast<vInstance*>(this)->logCallback = fn;
 	}
-	RESULT Instance::GetAllPhysicalDevices(PhysicalDevice** devices)
+	std::vector<Ptr<PhysicalDevice>> Instance::GetAllPhysicalDevices()
 	{
 		std::uint32_t count;
-		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
+		vkEnumeratePhysicalDevices(static_cast<VkInstance>(ID), &count, nullptr);
 		std::vector<VkPhysicalDevice> vk_devices(count);
-		VkResult res = vkEnumeratePhysicalDevices((VkInstance)ID, &count, vk_devices.data());
-		uint32_t i = 0;
+		VkResult res = vkEnumeratePhysicalDevices(static_cast<VkInstance>(ID), &count, vk_devices.data());
+		std::vector<Ptr<PhysicalDevice>> devices;
+		devices.resize(count);
 		for(auto dev : vk_devices)
 		{
-			devices[i] = new vPhysicalDevice;
-			devices[i]->ID = dev;
-			i++;
+			devices.emplace_back(new vPhysicalDevice);
+			devices.back()->ID = dev;
 		}
-		return res;
+		return devices;
 	}
 	API Instance::GetInstanceAPI()
 	{
@@ -150,10 +150,10 @@ namespace RHI
 		vkEnumeratePhysicalDevices((VkInstance)ID, &count, nullptr);
 		return count;
 	}
-	std::pair<uint32_t, uint32_t> Instance::GetSwapChainMinMaxImageCount(PhysicalDevice* pDev, Surface* surface)
+	std::pair<uint32_t, uint32_t> Instance::GetSwapChainMinMaxImageCount(Weak<PhysicalDevice> pDev, Surface* surface)
 	{
 		VkSurfaceCapabilitiesKHR caps;
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR((VkPhysicalDevice)pDev->ID,(VkSurfaceKHR)surface->ID,&caps);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(static_cast<VkPhysicalDevice>(pDev->ID),static_cast<VkSurfaceKHR>(surface->ID),&caps);
 		return {caps.minImageCount, caps.maxImageCount};
 	}
 	creation_result<SwapChain> Instance::CreateSwapChain(const SwapChainDesc& desc, PhysicalDevice* pDevice, Ptr<Device> Device, Weak<CommandQueue> pCommandQueue)
