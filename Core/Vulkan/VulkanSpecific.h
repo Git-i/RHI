@@ -316,7 +316,6 @@ namespace RHI
         {
             for(auto& texture : textures)
             {
-                delete texture.Raw();
                 texture = nullptr;
             }
             vkDestroySwapchainKHR(static_cast<VkDevice>(device->ID), static_cast<VkSwapchainKHR>(ID), nullptr);

@@ -208,7 +208,6 @@ namespace RHI
 			vswapChain->textures.back()->ID = image;
 			vswapChain->textures.back()->device = Device;
 			Device.retrieve_as_forced<vDevice>()->objects.emplace(vswapChain->textures.back().Raw(), "");
-			vswapChain->Hold();
 		}
 		VkFenceCreateInfo finfo{};
 		finfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
