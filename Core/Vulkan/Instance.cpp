@@ -203,7 +203,10 @@ namespace RHI
 		vkGetSwapchainImagesKHR(static_cast<VkDevice>(Device->ID), static_cast<VkSwapchainKHR>(vswapChain->ID), &image_count, images.data());
 		for(auto image : images)
 		{
-			struct SwapTexture : public Texture {};
+			struct SwapTexture : public Texture
+			{
+				int32_t GetType() override { return VK_OBJECT_TYPE_IMAGE; }
+			};
 			vswapChain->textures.emplace_back(new SwapTexture);
 			vswapChain->textures.back()->ID = image;
 			vswapChain->textures.back()->device = Device;
