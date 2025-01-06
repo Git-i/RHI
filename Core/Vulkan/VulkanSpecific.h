@@ -25,7 +25,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
-#include <vulkan/vulkan_core.h>
 namespace RHI
 {
 

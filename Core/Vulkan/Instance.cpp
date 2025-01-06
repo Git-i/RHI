@@ -9,7 +9,6 @@
 #include <vector>
 #include <iostream>
 #include <array>
-#include <vulkan/vulkan_core.h>
 #ifdef USE_GLFW
 #include <GLFW/glfw3.h>
 #endif

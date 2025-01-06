@@ -3,7 +3,6 @@
 #include "VulkanSpecific.h"
 #include <cstdint>
 #include <unordered_map>
-#include <vulkan/vulkan_core.h>
 namespace RHI
 {
 	Ptr<PhysicalDevice> PhysicalDevice::FromNativeHandle(Internal_ID id)

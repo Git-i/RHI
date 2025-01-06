@@ -43,9 +43,12 @@ vulkan_src = [
 ezr = subproject('ezr')
 ezr_dep = ezr.get_variable('ezr_dep')
 
-cpptrace = dependency('cpptrace')
-#dwarf = cpp.find_library('dwarf')
-deps = [ezr_dep, cpptrace]#, dwarf]
+deps = [ezr_dep]
+if get_option('track_resources')
+    deps += dependency('cpptrace')
+    deps += cpp.find_library('dwarf')
+    args += '-DRHI_TRACK_OBJECTS'
+endif
 if(get_option('API') == 'Vulkan')
 
     deps += dependency('vulkan')
@@ -82,6 +85,7 @@ if(build_machine.system() == 'linux')
 endif
 if(build_machine.system() == 'windows')
     add_project_arguments('-DVK_USE_PLATFORM_WIN32_KHR',language: 'cpp')
+    add_project_arguments('-DVK_USE_PLATFORM_WIN32_KHR',language: 'c')
 endif
 lib = library('RHI', vulkan_src, 
     include_directories: inc, 

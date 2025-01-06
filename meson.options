@@ -1,2 +1,3 @@
 option('API', type:'combo', choices:['Vulkan', 'D3D12'],value:'Vulkan')
+option('track_resources', type:'boolean', value:false)
 option('linux_window_subsys', type:'combo',choices:['glfw','xcb','wayland','xlib'],value:'glfw')

@@ -5,7 +5,6 @@
 #include "VulkanSpecific.h"
 #include <cstdint>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 namespace RHI
 {
 	SwapChainError marshall_swap_error(VkResult r)

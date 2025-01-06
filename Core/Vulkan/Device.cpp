@@ -26,7 +26,6 @@
 #include <ranges>
 #include <unordered_map>
 #include <vector>
-#include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #define VULKAN_AFTER_CRASH_IMPLEMENTATION
 #define VMA_STATIC_VULKAN_FUNCTIONS 1
@@ -34,14 +33,18 @@
 #include "vk_mem_alloc.h"
 #include <iostream>
 #include <fstream>
-#include "cpptrace/cpptrace.hpp"
 #ifndef ARRAYSIZE
 #define ARRAYSIZE(a) \
   ((sizeof(a) / sizeof(*(a))) / \
   static_cast<size_t>(!(sizeof(a) % sizeof(*(a)))))
 #endif
 using namespace ezr;
+#ifdef RHI_TRACK_OBJECTS
+#include "cpptrace/cpptrace.hpp"
 #define ADD_CHILD(child) child->device = make_ptr(this); reinterpret_cast<vDevice*>(this)->objects.emplace(child.Raw(), cpptrace::generate_trace().to_string());
+#else
+#define ADD_CHILD(child) child->device = make_ptr(this)
+#endif
 static void SelectHeapIndices(RHI::Weak<RHI::vDevice> device)
 {
     std::uint32_t DefaultHeap = UINT32_MAX;

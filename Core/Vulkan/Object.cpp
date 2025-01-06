@@ -2,7 +2,6 @@
 #include "../Object.h"
 #include "VulkanSpecific.h"
 #include <cstring>
-#include <vulkan/vulkan_core.h>
 
 namespace RHI {
 	uint32_t Object::Hold()
