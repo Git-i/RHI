@@ -344,18 +344,19 @@ namespace RHI
         auto* vtex = reinterpret_cast<vTexture*>(texture);
         #ifdef WIN32
         VkMemoryGetWin32HandleInfoKHR info;
-        info.memory = vtex->vma_ID ? vtex->vma_ID->GetMemory() : (VkDeviceMemory)vtex->heap;
+        info.memory = vtex->is_auto() ? vtex->vma_allocation()->GetMemory() : reinterpret_cast<VkDeviceMemory>(vtex->placed_data().heap.Get());
         info.pNext = 0;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         info.handleType = MemFlags(options);
         return vkGetMemoryWin32HandleKHR((VkDevice)ID, &info, handle);
-        #endif
+        #else
         VkMemoryGetFdInfoKHR info;
         info.handleType = MemFlags(options);
         info.memory = vtex->is_auto() ? vtex->vma_allocation()->GetMemory() : reinterpret_cast<VkDeviceMemory>(vtex->placed_data().heap.Get());
         info.pNext = nullptr;
         info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
         return vkGetMemoryFdKHR(static_cast<VkDevice>(ID),&info,handle);
+        #endif
 
     }
     RESULT Device::QueueWaitIdle(Weak<CommandQueue> queue)
@@ -875,7 +876,7 @@ namespace RHI
     creation_result<PipelineStateObject> Device::CreatePipelineStateObject(const PipelineStateObjectDesc& desc)
     {
         Ptr<vPipelineStateObject> vPSO(new vPipelineStateObject);
-        GFX_ASSERT(desc->numInputElements < 5);
+        GFX_ASSERT(desc.numInputElements < 5);
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
         int index = 0;

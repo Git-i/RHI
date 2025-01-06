@@ -1,5 +1,6 @@
 project('RHI','cpp','c',default_options: ['cpp_std=c++20','werror=false'])
 pymodule = import('python')
+fs = import('fs')
 python3 = pymodule.find_installation('python3')
 
 res = run_command(python3, '-c', 'import os; print(os.environ["VULKAN_SDK"])')
@@ -11,7 +12,7 @@ endif
 
 glfw3_dep= dependency('glfw3')
 cpp = meson.get_compiler('cpp')
-args = []
+args = ['-DRHI_DLL']
 inc_list = [
     '.','Core/'
     ]
@@ -43,8 +44,8 @@ ezr = subproject('ezr')
 ezr_dep = ezr.get_variable('ezr_dep')
 
 cpptrace = dependency('cpptrace')
-dwarf = cpp.find_library('dwarf')
-deps = [ezr_dep, cpptrace, dwarf]
+#dwarf = cpp.find_library('dwarf')
+deps = [ezr_dep, cpptrace]#, dwarf]
 if(get_option('API') == 'Vulkan')
 
     deps += dependency('vulkan')
@@ -56,7 +57,13 @@ if(get_option('API') == 'Vulkan')
         vulkan_sdk / 'include',
         vulkan_sdk / 'include' / 'vma'
     ]
-    vulkan_src += vulkan_sdk / 'include' / 'volk.c'
+    volk_src = vulkan_sdk / 'include' / 'volk.c'
+    #it can be placed in a different spot(at least on windows)
+    if not fs.is_file(volk_src)
+        volk_src = vulkan_sdk / 'Include' / 'Volk' / 'volk.c'
+        inc_list += vulkan_sdk / 'Include' / 'Volk'
+    endif
+    vulkan_src += volk_src
 endif
 
 inc = include_directories(inc_list)

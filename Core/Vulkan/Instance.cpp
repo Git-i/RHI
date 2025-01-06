@@ -50,14 +50,14 @@ namespace RHI
 		Ptr<vInstance> vinstance(new RHI::vInstance);
 		VkResult res = volkInitialize();
 		if(res != VK_SUCCESS) return ezr::err(marshall_error(res));
-		VkValidationFeatureEnableEXT enabled[] =
+		std::array<VkValidationFeatureEnableEXT, 0> enabled =
 		{
 			//VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
 		};
 		VkValidationFeaturesEXT features{};
 		features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-		features.pEnabledValidationFeatures = enabled;
-		features.enabledValidationFeatureCount = sizeof(enabled) / sizeof(VkValidationFeatureEnableEXT);
+		features.pEnabledValidationFeatures = enabled.data();
+		features.enabledValidationFeatureCount = enabled.size();
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "NULL";

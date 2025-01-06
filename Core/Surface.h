@@ -11,7 +11,7 @@ namespace RHI
 	{
 	public:
 #ifdef _WIN32
-		RHI::CreationError InitWin32(HWND hwnd, Internal_ID instance);
+		static creation_result<Surface> InitWin32(HWND hwnd, Ptr<Instance> instance);
 #endif
 
 #ifdef __ANDROID__

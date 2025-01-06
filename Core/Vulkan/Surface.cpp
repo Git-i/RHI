@@ -6,13 +6,17 @@
 namespace RHI
 {
 	#ifdef WIN32
-	void RHI::Surface::InitWin32(HWND hwnd, Internal_ID instance)
+	creation_result<Surface> Surface::InitWin32(HWND hwnd, Ptr<Instance> instance)
 	{
+		Ptr<Surface> srf(new vSurface);
 		VkWin32SurfaceCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 		createInfo.hwnd = hwnd;
 		createInfo.hinstance = GetModuleHandle(nullptr);
-		vkCreateWin32SurfaceKHR((VkInstance)instance, &createInfo, nullptr, (VkSurfaceKHR*)&ID);
+		auto res = vkCreateWin32SurfaceKHR((VkInstance)instance->ID, &createInfo, nullptr, reinterpret_cast<VkSurfaceKHR*>(&srf->ID));
+		if (res != VK_SUCCESS) return ezr::err(marshall_error(res));
+		srf.retrieve_as_forced<vSurface>()->instance = instance;
+		return srf;
 	}
 	#endif
 	#ifdef __linux__
