@@ -147,7 +147,7 @@ namespace RHI
 		MAX_COMMON_FORMAT = 200
 	};
 	int FormatToVk(RHI::Format f);
-	RHI::Format FormatFromVk(int vk_format);
+	RHI::Format RHI_API FormatFromVk(int vk_format);
 	struct Rational
 	{
 		unsigned int Numerator;

@@ -10,9 +10,11 @@ if has_vulkan_sdk
     vulkan_sdk = res.stdout().strip()
 endif
 
-glfw3_dep= dependency('glfw3')
 cpp = meson.get_compiler('cpp')
 args = ['-DRHI_DLL']
+if get_option('using_dll')
+    args += '-DUSE_DLL'
+endif
 inc_list = [
     '.','Core/'
     ]
@@ -80,6 +82,7 @@ if(build_machine.system() == 'linux')
         add_project_arguments('-DVK_USE_PLATFORM_WAYLAND_KHR',language: 'cpp')
     elif(get_option('linux_window_subsys') == 'glfw')
         add_project_arguments('-DUSE_GLFW',language: 'cpp')
+        glfw3_dep= dependency('glfw3')
         deps += glfw3_dep
     endif
 endif

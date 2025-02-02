@@ -1,5 +1,5 @@
 #pragma once
-#ifdef _WIN32
+#if defined(_MSC_VER) && defined(USE_DLL)
 #ifdef RHI_DLL
 #define RHI_API __declspec(dllexport)
 #else
