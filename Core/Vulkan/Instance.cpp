@@ -27,7 +27,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	std::cerr << std::endl << "validation layer" << pCallbackData->pMessage + ind << std::endl;
 	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && pCallbackData->messageIdNumber != -937765618 && pCallbackData->messageIdNumber!=-1831440447)// && pCallbackData->messageIdNumber != 0x4dae5635)
 	{
-		DEBUG_BREAK;
+		//DEBUG_BREAK;
 	}
 
 	return VK_FALSE;

@@ -879,7 +879,7 @@ namespace RHI
     creation_result<PipelineStateObject> Device::CreatePipelineStateObject(const PipelineStateObjectDesc& desc)
     {
         Ptr<vPipelineStateObject> vPSO(new vPipelineStateObject);
-        GFX_ASSERT(desc.numInputElements < 5);
+        GFX_ASSERT(desc.numInputElements < 10);
         VkPipelineShaderStageCreateInfo ShaderpipelineInfo[5] = {};
         VkShaderModule modules[5];
         int index = 0;
@@ -918,8 +918,8 @@ namespace RHI
         err = createShader(desc.DS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
         if(cleanShaders(err)) return ezr::err(err);
         
-        VkVertexInputAttributeDescription inputAttribDesc[5];
-        VkVertexInputBindingDescription inputbindingDesc[5];
+        VkVertexInputAttributeDescription inputAttribDesc[10];
+        VkVertexInputBindingDescription inputbindingDesc[10];
         for (uint32_t i = 0; i < desc.numInputElements ; i++)
         {
             inputAttribDesc[i].format = FormatConv(desc.inputElements[i].format);
